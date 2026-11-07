@@ -650,6 +650,7 @@ dependencies = [
     { name = "mcp" },
     { name = "pyjwt", extra = ["crypto"] },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -663,6 +664,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.3.0" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.15.1" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
+    { name = "python-multipart", specifier = ">=0.0.33" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
 ]
 

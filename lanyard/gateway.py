@@ -10,6 +10,8 @@ Agents connect to POST /mcp with an Auth0 access token. For each JSON-RPC messag
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -21,7 +23,7 @@ import httpx
 import jwt
 from dotenv import dotenv_values
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from . import workload
 from .tokens import TokenSigner
@@ -100,23 +102,90 @@ def agent_name(agent_id: str) -> str:
     return agent_id[:10]
 
 
+SESSION_COOKIE = "lanyard_admin"
+SESSION_SECONDS = 12 * 3600
+
+
+def _session_value(expires: int) -> str:
+    sig = hmac.new(ADMIN_PASSWORD.encode(), f"lanyard-console:{expires}".encode(), hashlib.sha256).hexdigest()
+    return f"{expires}.{sig}"
+
+
+def _valid_session(cookie: str | None) -> bool:
+    try:
+        expires = int((cookie or "").split(".", 1)[0])
+    except ValueError:
+        return False
+    return expires > time.time() and secrets.compare_digest(cookie, _session_value(expires))
+
+
+def _admin_ok(request: Request) -> bool:
+    if _valid_session(request.cookies.get(SESSION_COOKIE)):
+        return True
+    auth = request.headers.get("authorization", "")  # scripts may still use HTTP Basic
+    if auth.lower().startswith("basic "):
+        try:
+            _, _, pw = base64.b64decode(auth[6:]).decode().partition(":")
+            return secrets.compare_digest(pw, ADMIN_PASSWORD)
+        except ValueError:
+            return False
+    return False
+
+
 @app.middleware("http")
 async def admin_auth(request: Request, call_next):
-    """Dashboard and admin API require a password when LANYARD_ADMIN_PASSWORD is set.
-    The /mcp endpoint is protected separately, by the agent's JWT."""
-    if ADMIN_PASSWORD and not request.url.path.startswith(("/mcp", "/auth/", "/.well-known/")):
-        ok = False
-        auth = request.headers.get("authorization", "")
-        if auth.lower().startswith("basic "):
-            try:
-                _, _, pw = base64.b64decode(auth[6:]).decode().partition(":")
-                ok = secrets.compare_digest(pw, ADMIN_PASSWORD)
-            except ValueError:
-                ok = False
-        if not ok:
-            return Response("Lanyard admin login required", status_code=401,
-                            headers={"WWW-Authenticate": 'Basic realm="Lanyard admin"'})
+    """The console and admin API need the admin password (login page or HTTP Basic) when
+    LANYARD_ADMIN_PASSWORD is set. /mcp and /auth/* are protected separately, by agent tokens."""
+    open_paths = ("/mcp", "/auth/", "/.well-known/", "/login")
+    if ADMIN_PASSWORD and not request.url.path.startswith(open_paths) and not _admin_ok(request):
+        if request.url.path == "/":
+            return HTMLResponse(LOGIN_PAGE.replace("{error}", ""))
+        return JSONResponse({"error": "admin login required"}, status_code=401)
     return await call_next(request)
+
+
+@app.post("/login")
+async def login(request: Request):
+    form = await request.form()
+    if not ADMIN_PASSWORD:
+        return RedirectResponse("/", status_code=303)
+    if not secrets.compare_digest(str(form.get("password", "")), ADMIN_PASSWORD):
+        await asyncio.sleep(1)  # slow down guessing
+        return HTMLResponse(LOGIN_PAGE.replace("{error}", '<p class="err">Wrong password.</p>'), status_code=401)
+    resp = RedirectResponse("/", status_code=303)
+    resp.set_cookie(SESSION_COOKIE, _session_value(int(time.time()) + SESSION_SECONDS), max_age=SESSION_SECONDS,
+                    httponly=True, samesite="strict", secure=request.url.scheme == "https")
+    return resp
+
+
+@app.get("/logout")
+async def logout():
+    resp = RedirectResponse("/", status_code=303)
+    resp.delete_cookie(SESSION_COOKIE)
+    return resp
+
+
+LOGIN_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Lanyard Console</title>
+<style>
+:root{color-scheme:light;--page:#f4f4f1;--surface:#fcfcfb;--ink:#0b0b0b;--muted:#75736d;--line:rgba(11,11,11,.12);--accent:#2a78d6;--crit:#b42323}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--muted:#94928b;--line:rgba(255,255,255,.12);--accent:#3987e5;--crit:#f07a7a}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--page);color:var(--ink);
+font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+form{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px}
+.mark{width:36px;height:36px;border-radius:9px;background:var(--accent);display:grid;place-items:center;margin-bottom:14px}
+h1{font-size:20px;margin:0 0 4px}p{margin:0 0 18px;color:var(--muted)}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+input{width:100%;font:inherit;color:inherit;background:var(--page);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+button{margin-top:14px;width:100%;font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px;background:var(--accent);color:#fff;cursor:pointer}
+.err{color:var(--crit);margin:10px 0 0}
+</style></head><body>
+<form method="post" action="/login">
+<div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l4 6 4-6"/><rect x="5" y="8" width="14" height="14" rx="2.5"/><circle cx="12" cy="13.5" r="2"/><path d="M9 18.5h6"/></svg></div>
+<h1>Lanyard Console</h1><p>Identity and access control for AI agents</p>
+<label for="pw">Admin password</label><input id="pw" name="password" type="password" autocomplete="current-password" autofocus required>
+{error}<button type="submit">Sign in</button></form></body></html>"""
+
 
 # Optional: scan tool responses with Bedrock Guardrails. Fails closed unless LANYARD_GUARDRAIL_FAIL=open.
 guard = (ToolResponseGuard(ENV["LANYARD_GUARDRAIL_ID"], ENV.get("LANYARD_GUARDRAIL_VERSION", "DRAFT"),
