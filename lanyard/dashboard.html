@@ -201,6 +201,18 @@
   .check b { display: block; font-weight: 600; }
   .check span { color: var(--muted); font-size: 12.5px; }
 
+  .attacks { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .attack { display: grid; gap: 10px; align-content: start; }
+  .attack h3 { margin: 0; font-size: 14.5px; }
+  .attack .goal { font-size: 13px; color: var(--ink-2); }
+  .attack .goal b, .attack .def b { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 2px; }
+  .attack .def { font-size: 13px; color: var(--ink-2); }
+  .attack .res { border-radius: 8px; padding: 9px 11px; font-size: 12.5px; overflow-wrap: anywhere; }
+  .attack .res.ok { background: var(--good-wash); }
+  .attack .res.bad { background: var(--crit-wash); }
+  .attack .res.skip { background: var(--hover); }
+  .attack .res .mono { font-size: 12px; color: var(--ink-2); display: block; margin-top: 4px; }
+  .attack .row { display: flex; align-items: center; gap: 10px; margin-top: auto; }
   .toast { position: fixed; right: 20px; bottom: 20px; z-index: 60; background: var(--ink); color: var(--page); padding: 10px 14px; border-radius: 10px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; }
   .toast.on { opacity: 1; transform: none; }
 
@@ -240,6 +252,7 @@
       <a href="#/agents" data-r="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M12 7V3M8.5 12h.01M15.5 12h.01M9 16h6"/></svg>Agents<span class="count" id="n-agents-rev" hidden></span></a>
       <a href="#/approvals" data-r="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Approvals<span class="count" id="n-approvals" hidden></span></a>
       <a href="#/audit" data-r="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Audit log</a>
+      <a href="#/attacks" data-r="attacks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Attack lab</a>
       <a href="#/policy" data-r="policy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Policy</a>
     </nav>
     <div class="side-foot" id="side-foot">
@@ -280,6 +293,7 @@ function action(e) {
   if (e.method === "admin") return e.tool ? `admin · ${e.tool}` : "admin";
   if (e.method === "auth/aws") return "sign-in (AWS IAM)";
   if (e.method === "auth/delegate") return "create sub-agent";
+  if (e.method === "attack") return `attack lab · ${e.tool}`;
   if (e.method === "initialize") return "session start";
   return e.method;
 }
@@ -434,6 +448,7 @@ function approvalCard(a) {
   </div>`;
 }
 function identityBadge(a) {
+  if (a.identity === "red-team") return `<span class="badge">${ICON.sub}Attack lab identity</span>`;
   if (a.identity === "delegated") return `<span class="badge">${ICON.sub}Sub-agent of ${esc(nameOf(a.parent))} · scoped token</span>`;
   return a.identity === "aws-iam"
     ? `<span class="badge">${ICON.aws}AWS IAM role · no stored secret</span>`
@@ -592,6 +607,31 @@ const VIEWS = {
     },
   },
 
+  attacks: {
+    title: "Attack lab",
+    desc: "Real attacks against this gateway, sent through the same endpoints an attacker would use. Each one should be blocked.",
+    mount: async v => {
+      v.innerHTML = `<div class="panel"><div class="panel-h"><h3>Red team</h3><span class="sub">attacks run as red-team-bot and appear in the audit log</span><button class="btn right" onclick="runAllAttacks()">Run all attacks</button></div><div class="attacks" id="atk"></div></div>`;
+      if (!S.attacks) { try { S.attacks = (await api("/api/attacks")).attacks; } catch (e) { S.attacks = []; } }
+      VIEWS.attacks.update(true);
+    },
+    update(force) {
+      const el = document.getElementById("atk"); if (!el || !S.attacks) return;
+      const html = S.attacks.map(a => {
+        const r = ATTACK_RESULTS[a.id];
+        const res = !r ? "" : r.blocked === true ? `<div class="res ok"><span class="pill allow">Blocked</span><span class="mono">${esc(r.observed)}</span></div>`
+          : r.blocked === false ? `<div class="res bad"><span class="pill deny">Not blocked</span><span class="mono">${esc(r.observed)}</span></div>`
+          : `<div class="res skip"><span class="pill admin">Skipped</span><span class="mono">${esc(r.observed)}</span></div>`;
+        return `<div class="panel attack"><h3>${esc(a.title)}</h3>
+          <div class="goal"><b>Attacker tries</b>${esc(a.goal)}</div>
+          <div class="def"><b>Lanyard's defense</b>${esc(a.defense)}</div>
+          ${res}
+          <div class="row"><button class="btn" data-attack="${esc(a.id)}" onclick="runAttack('${esc(a.id)}')">${r ? "Run again" : "Run attack"}</button></div></div>`;
+      }).join("");
+      if (force || el._html !== html) { el.innerHTML = html; el._html = html; }
+    },
+  },
+
   policy: {
     title: "Policy",
     desc: "The rules Lanyard enforces on every call. Tools with no rule are denied by default.",
@@ -632,6 +672,18 @@ const VIEWS = {
     },
   },
 };
+
+const ATTACK_RESULTS = {};
+async function runAttack(id) {
+  const btn = document.querySelector(`[data-attack="${id}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "Running…"; }
+  try { ATTACK_RESULTS[id] = await api(`/api/attacks/${id}`, { method: "POST" }); }
+  catch (e) { ATTACK_RESULTS[id] = { blocked: false, observed: `Request failed (${e.message})` }; }
+  if (route === "attacks") VIEWS.attacks.update(true);
+  poll();
+}
+window.runAttack = runAttack;
+window.runAllAttacks = async () => { for (const a of (S.attacks || [])) await runAttack(a.id); };
 
 function downloadCSV() {
   const rows = VIEWS.audit.filtered();

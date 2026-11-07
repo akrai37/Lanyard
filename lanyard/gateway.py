@@ -525,6 +525,45 @@ async def policy():
     }
 
 
+@app.get("/api/attacks")
+async def list_attacks():
+    from .attacks import ATTACKS
+    return {"attacks": ATTACKS}
+
+
+@app.post("/api/attacks/{attack_id}")
+async def run_attack(attack_id: str, request: Request):
+    from . import attacks
+
+    if not SIGNING_KEY:
+        return JSONResponse({"error": "the attack lab needs LANYARD_SIGNING_KEY"}, status_code=400)
+
+    def mint(scopes: list[str]) -> str:
+        now = int(time.time())
+        return jwt.encode({"iss": workload.LANYARD_ISSUER, "aud": AUDIENCE, "sub": attacks.RED_TEAM_ID,
+                           "azp": attacks.RED_TEAM_ID, "scope": " ".join(scopes), "iat": now, "exp": now + 600,
+                           "lanyard_identity": "red-team", "lanyard_name": attacks.RED_TEAM_ID},
+                          SIGNING_KEY, algorithm="HS256")
+
+    def sign_proof(audience: str):
+        try:
+            return workload.sign_identity_proof(audience, boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION))
+        except Exception:
+            return None
+
+    ctx = {"audience": AUDIENCE, "auth0_issuer": ISSUER, "mint": mint, "guardrail": guard is not None,
+           "revoke": lambda a: store.revoke(a, reason="attack lab"), "restore": store.restore, "sign_proof": sign_proof}
+    try:
+        result = await attacks.run_attack(attack_id, str(request.base_url).rstrip("/"), http, ctx)
+    except KeyError:
+        return JSONResponse({"error": f"unknown attack: {attack_id}"}, status_code=404)
+    store.log(agent_id=attacks.RED_TEAM_ID, agent_name=attacks.RED_TEAM_ID, method="attack", tool=attack_id,
+              decision="error" if result["blocked"] is False else "admin",  # the blocked call itself is logged as a deny
+              reason=("attack lab: blocked" if result["blocked"] else "attack lab: NOT blocked" if result["blocked"] is False
+                      else "attack lab: skipped") + f" ({attack_id})")
+    return {"id": attack_id, **result}
+
+
 @app.post("/api/reset")
 async def reset():
     # Give revoked agents their Auth0 grants back first, or a reset would strand them.
