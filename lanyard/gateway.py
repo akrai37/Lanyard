@@ -518,6 +518,8 @@ async def policy():
         "environment": "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local",
         "approval_timeout": APPROVAL_TIMEOUT_SECONDS,
         "risky_scopes": sorted(RISKY_SCOPES),
+        "audit_archive": ENV.get("LANYARD_AUDIT_BUCKET"),
+        "files_bucket": ENV.get("LANYARD_FILES_BUCKET"),
         "max_delegation_depth": MAX_DELEGATION_DEPTH,
         "workload_token_minutes": workload.TOKEN_TTL_SECONDS // 60,
     }

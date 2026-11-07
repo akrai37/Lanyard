@@ -28,20 +28,25 @@ iam, lam, sts = session.client("iam"), session.client("lambda"), session.client(
 ACCOUNT = sts.get_caller_identity()["Account"]
 ZIP = (ROOT / "build" / "lanyard.zip").read_bytes()
 TABLE = ENV.get("LANYARD_TABLE", "lanyard")
+FILES_BUCKET = f"lanyard-files-{ACCOUNT}"
+AUDIT_BUCKET = f"lanyard-audit-{ACCOUNT}"
+SIM_KINDS = ["billing", "support", "analytics", "release", "research"]
 
 TRUST = json.dumps({"Version": "2012-10-17", "Statement": [{
     "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole"}]})
 
 
-def role(name: str, inline: dict | None = None) -> str:
+def role(name: str, inline: dict | None = None, trust: str = TRUST, lambda_role: bool = True) -> str:
     try:
         arn = iam.get_role(RoleName=name)["Role"]["Arn"]
+        iam.update_assume_role_policy(RoleName=name, PolicyDocument=trust)
         fresh = False
     except iam.exceptions.NoSuchEntityException:
-        arn = iam.create_role(RoleName=name, AssumeRolePolicyDocument=TRUST)["Role"]["Arn"]
+        arn = iam.create_role(RoleName=name, AssumeRolePolicyDocument=trust)["Role"]["Arn"]
         fresh = True
-    iam.attach_role_policy(RoleName=name,
-                           PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole")
+    if lambda_role:
+        iam.attach_role_policy(RoleName=name,
+                               PolicyArn="arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole")
     if inline:
         iam.put_role_policy(RoleName=name, PolicyName=f"{name}-policy", PolicyDocument=json.dumps(inline))
     if fresh:
@@ -116,6 +121,66 @@ def gateway_secret(password: str) -> str:
     return arn
 
 
+def audit_bucket() -> None:
+    """Private bucket with Object Lock (compliance mode): archived audit records can't be altered."""
+    s3 = session.client("s3")
+    try:
+        s3.head_bucket(Bucket=AUDIT_BUCKET)
+    except ClientError:
+        s3.create_bucket(Bucket=AUDIT_BUCKET, ObjectLockEnabledForBucket=True)
+        print(f"  created {AUDIT_BUCKET}")
+    s3.put_public_access_block(Bucket=AUDIT_BUCKET, PublicAccessBlockConfiguration={
+        "BlockPublicAcls": True, "IgnorePublicAcls": True, "BlockPublicPolicy": True, "RestrictPublicBuckets": True})
+    s3.put_object_lock_configuration(Bucket=AUDIT_BUCKET, ObjectLockConfiguration={
+        "ObjectLockEnabled": "Enabled", "Rule": {"DefaultRetention": {"Mode": "COMPLIANCE", "Days": 1}}})
+
+
+def table_stream() -> str:
+    ddb = session.client("dynamodb")
+    desc = ddb.describe_table(TableName=TABLE)["Table"]
+    if not desc.get("StreamSpecification", {}).get("StreamEnabled"):
+        ddb.update_table(TableName=TABLE, StreamSpecification={"StreamEnabled": True, "StreamViewType": "NEW_IMAGE"})
+        ddb.get_waiter("table_exists").wait(TableName=TABLE)
+        for _ in range(30):
+            desc = ddb.describe_table(TableName=TABLE)["Table"]
+            if desc.get("LatestStreamArn"):
+                break
+            time.sleep(2)
+        print("  enabled DynamoDB stream")
+    return desc["LatestStreamArn"]
+
+
+def stream_mapping(function_name: str, stream_arn: str) -> None:
+    existing = lam.list_event_source_mappings(FunctionName=function_name, EventSourceArn=stream_arn)
+    if existing["EventSourceMappings"]:
+        return
+    lam.create_event_source_mapping(
+        FunctionName=function_name, EventSourceArn=stream_arn, StartingPosition="LATEST",
+        BatchSize=100, MaximumBatchingWindowInSeconds=10,
+        FilterCriteria={"Filters": [{"Pattern": json.dumps(
+            {"eventName": ["INSERT"], "dynamodb": {"NewImage": {"pk": {"S": ["audit"]}}}})}]})
+    print("  connected stream to lanyard-archiver")
+
+
+def schedule(function_arn: str) -> None:
+    """EventBridge rule that starts the simulator every minute. Created disabled; scripts/simulator.sh toggles it."""
+    ev = session.client("events")
+    try:
+        state = ev.describe_rule(Name="lanyard-simulator")["State"]
+    except ev.exceptions.ResourceNotFoundException:
+        state = "DISABLED"
+    rule_arn = ev.put_rule(Name="lanyard-simulator", ScheduleExpression="rate(1 minute)", State=state,
+                           Description="Lanyard traffic simulator")["RuleArn"]
+    ev.put_targets(Rule="lanyard-simulator", Targets=[{"Id": "simulator", "Arn": function_arn}])
+    try:
+        lam.add_permission(FunctionName="lanyard-simulator", StatementId="eventbridge", Action="lambda:InvokeFunction",
+                           Principal="events.amazonaws.com", SourceArn=rule_arn)
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ResourceConflictException":
+            raise
+    print(f"  schedule lanyard-simulator: {state.lower()} (scripts/simulator.sh on|off)")
+
+
 def main():
     password = ENV.get("LANYARD_CLOUD_ADMIN_PASSWORD")
     if not password:
@@ -126,7 +191,9 @@ def main():
     secret_arn = gateway_secret(password)
 
     print("IAM roles")
-    tools_role = role("lanyard-tools-role")
+    tools_role = role("lanyard-tools-role", {"Version": "2012-10-17", "Statement": [
+        {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject"], "Resource": f"arn:aws:s3:::{FILES_BUCKET}/*"},
+        {"Effect": "Allow", "Action": "s3:ListBucket", "Resource": f"arn:aws:s3:::{FILES_BUCKET}"}]})
     worker_role = role("lanyard-worker-role")  # no AWS permissions: its identity is all it needs
     gateway_role = role("lanyard-gateway-role", {"Version": "2012-10-17", "Statement": [
         {"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": secret_arn},
@@ -142,7 +209,8 @@ def main():
     ]})
 
     print("Tool functions (private)")
-    function("lanyard-files", tools_role, "servers.lambda_handler.handler", {"LANYARD_TOOL_SERVER": "files"}, 30)
+    function("lanyard-files", tools_role, "servers.lambda_handler.handler",
+             {"LANYARD_TOOL_SERVER": "files", "FILES_BUCKET": FILES_BUCKET}, 30)
     function("lanyard-deploy", tools_role, "servers.lambda_handler.handler", {"LANYARD_TOOL_SERVER": "deploy"}, 30)
 
     print("Gateway function")
@@ -152,6 +220,8 @@ def main():
         "LANYARD_BACKENDS": json.dumps({"files": "lambda:lanyard-files", "deploy": "lambda:lanyard-deploy"}),
         "LANYARD_SECRET_ID": "lanyard/gateway",
         "LANYARD_AWS_ACCOUNT": ACCOUNT,
+        "LANYARD_AUDIT_BUCKET": AUDIT_BUCKET,
+        "LANYARD_FILES_BUCKET": FILES_BUCKET,
     }
     for k, v in ENV.items():  # client IDs only (for display names), never secrets
         if k.endswith("_CLIENT_ID") and v:
@@ -165,6 +235,28 @@ def main():
     print("Cloud agent (workload identity)")
     function("lanyard-worker", worker_role, "lanyard.worker_handler.handler",
              {"LANYARD_URL": url, "LANYARD_AUDIENCE": ENV["AUTH0_AUDIENCE"]}, timeout=300)
+
+    print("Traffic simulator")
+    sim_role = role("lanyard-simulator-role", {"Version": "2012-10-17", "Statement": [
+        {"Effect": "Allow", "Action": "sts:AssumeRole", "Resource": f"arn:aws:iam::{ACCOUNT}:role/lanyard-sim-*"}]})
+    sim_trust = json.dumps({"Version": "2012-10-17", "Statement": [{
+        "Effect": "Allow", "Action": "sts:AssumeRole",
+        "Principal": {"AWS": [sim_role, f"arn:aws:iam::{ACCOUNT}:root"]}}]})
+    for kind in SIM_KINDS:  # one identity per simulated agent; no permissions, identity only
+        role(f"lanyard-sim-{kind}", trust=sim_trust, lambda_role=False)
+    sim_arn = function("lanyard-simulator", sim_role, "lanyard.simulator.handler",
+                       {"LANYARD_URL": url, "LANYARD_AUDIENCE": ENV["AUTH0_AUDIENCE"]}, timeout=90)
+    schedule(sim_arn)
+
+    print("Audit archive (DynamoDB stream -> S3 Object Lock)")
+    audit_bucket()
+    stream_arn = table_stream()
+    archiver_role = role("lanyard-archiver-role", {"Version": "2012-10-17", "Statement": [
+        {"Effect": "Allow", "Action": ["dynamodb:GetRecords", "dynamodb:GetShardIterator", "dynamodb:DescribeStream",
+                                       "dynamodb:ListStreams"], "Resource": stream_arn},
+        {"Effect": "Allow", "Action": "s3:PutObject", "Resource": f"arn:aws:s3:::{AUDIT_BUCKET}/*"}]})
+    function("lanyard-archiver", archiver_role, "lanyard.archiver.handler", {"AUDIT_BUCKET": AUDIT_BUCKET}, timeout=60)
+    stream_mapping("lanyard-archiver", stream_arn)
 
     set_key(str(ENV_FILE), "LANYARD_CLOUD_URL", url, quote_mode="never")
     print(f"\nDashboard: {url}/   (user: admin, password: LANYARD_CLOUD_ADMIN_PASSWORD in .env)")

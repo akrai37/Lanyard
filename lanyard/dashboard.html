@@ -607,6 +607,7 @@ const VIEWS = {
               <dt>Enterprise IdP</dt><dd>Auth0 (Okta) · <span class="mono">${esc(p.auth0_domain)}</span></dd>
               <dt>Agent sign-in</dt><dd>OAuth 2.0 client credentials, RS256 JWT verified against Auth0's public keys</dd>
               <dt>Workloads</dt><dd>${p.workloads.length ? `AWS IAM roles in account <span class="mono">${esc(p.aws_account)}</span>, ${p.workload_token_minutes}-minute Lanyard tokens` : "not enabled"}</dd>
+              ${p.files_bucket ? `<dt>File share</dt><dd>Amazon S3 · <span class="mono">${esc(p.files_bucket)}</span> (private, encrypted)</dd>` : ""}
               <dt>Revocation key</dt><dd>The agent's identity (client ID or IAM role), not its token</dd>
             </dl></div>
           <div class="panel"><div class="panel-h"><h3>Safeguards</h3></div><div class="checks">
@@ -616,6 +617,7 @@ const VIEWS = {
             ${check(p.guardrail, "Bedrock Guardrails on tool responses", p.guardrail ? `Blocks prompt injection, masks emails and phones; fails ${esc(p.guardrail_fail)}` : "Not configured")}
             ${check(true, "Human approval for high-risk calls", `Undecided requests expire after ${p.approval_timeout}s`)}
             ${check(p.guardrail, "Taint after prompt injection", `An agent that read an injection needs approval for ${(p.risky_scopes || []).join(", ")} until an admin clears it`)}
+            ${check(!!p.audit_archive, "Tamper-proof audit archive", p.audit_archive ? `Every decision copied to s3://${esc(p.audit_archive)} with Object Lock: nobody can edit or delete it` : "Local log only (cloud deploys archive to S3 with Object Lock)")}
             ${check(true, "Sub-agents can't exceed their parent", `Up to ${p.max_delegation_depth} levels; revoking a parent cuts off every sub-agent below it`)}
           </div></div>
         </div>

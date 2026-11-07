@@ -31,6 +31,12 @@ WORKLOAD_IDENTITIES = {
     "lanyard-worker-role": {"name": "aws-worker-agent", "scopes": ["files:read", "deploy:run"]},
     # The hackathon participant role, so a laptop with event credentials can demo the flow
     "WSParticipantRole": {"name": "laptop-aws-agent", "scopes": ["files:read"]},
+    # Simulated agents (lanyard/simulator.py), each with its own role
+    "lanyard-sim-billing": {"name": "billing-bot", "scopes": ["files:read"]},
+    "lanyard-sim-support": {"name": "support-assistant", "scopes": ["files:read"]},
+    "lanyard-sim-analytics": {"name": "analytics-agent", "scopes": ["files:read"]},
+    "lanyard-sim-release": {"name": "release-bot", "scopes": ["files:read", "deploy:run"]},
+    "lanyard-sim-research": {"name": "research-agent", "scopes": ["files:read", "files:write"]},
 }
 
 
