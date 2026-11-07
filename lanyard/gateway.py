@@ -20,7 +20,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .guardrails import ToolResponseGuard
-from .policy import BACKENDS, TOOL_SCOPES
+from .policy import APPROVAL_TIMEOUT_SECONDS, BACKENDS, TOOL_SCOPES, needs_approval
 from .store import SQLiteStore
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -173,6 +173,32 @@ async def mcp_endpoint(request: Request):
         if not ok:
             log("deny", reason, arguments=params.get("arguments"))
             return rpc_result(rid, denied_tool_result(f"Lanyard denied this call: {reason}."))
+
+        # high-risk call: hold it until a human approves or denies on the dashboard
+        arguments = params.get("arguments") or {}
+        if needs_approval(tool, arguments):
+            approval_id = store.request_approval(agent_id, name, tool, arguments)
+            log("pending", "high-risk call: waiting for human approval",
+                arguments=arguments, approval_id=approval_id)
+            deadline = time.monotonic() + APPROVAL_TIMEOUT_SECONDS
+            status = "pending"
+            while status == "pending" and time.monotonic() < deadline:
+                await asyncio.sleep(0.5)
+                status = store.approval_status(approval_id)
+                if status == "pending" and store.revocation(agent_id):
+                    store.decide_approval(approval_id, "expired")
+                    log("deny", "agent revoked while awaiting approval")
+                    return rpc_error(rid, -32003, f"Lanyard: access revoked for {name}", status=403)
+            if status == "pending":
+                store.decide_approval(approval_id, "expired")
+                log("deny", f"no approval within {APPROVAL_TIMEOUT_SECONDS}s")
+                return rpc_result(rid, denied_tool_result(
+                    "Lanyard denied this call: no human approval was given in time."))
+            if status != "approved":
+                log("deny", "denied by human reviewer", arguments=arguments)
+                return rpc_result(rid, denied_tool_result(
+                    "Lanyard denied this call: a human reviewer rejected it."))
+            reason += "; approved by human"
         catalog = await tool_catalog()
         if tool not in catalog:
             catalog = await tool_catalog(refresh=True)
@@ -246,7 +272,25 @@ async def state(after: int = 0):
                 status = "allowed"
             tools.append({"name": t, "scope": scope, "status": status})
         agents.append(a | {"revoked": store.revocation(a["agent_id"]), "tools": tools})
-    return {"agents": agents, "events": store.events(after)}
+    return {"agents": agents, "approvals": store.pending_approvals(), "events": store.events(after)}
+
+
+@app.post("/api/approvals/{approval_id}/{decision}")
+async def decide(approval_id: int, decision: str):
+    if decision not in ("approve", "deny"):
+        return JSONResponse({"error": "decision must be approve or deny"}, status_code=400)
+    a = store.decide_approval(approval_id, "approved" if decision == "approve" else "denied")
+    if a is None:
+        return JSONResponse({"error": "approval is no longer pending"}, status_code=409)
+    store.log(agent_id=a["agent_id"], agent_name=a["agent_name"], method="admin", tool=a["tool"],
+              decision="admin", reason=f"human {'approved' if decision == 'approve' else 'denied'} {a['tool']}")
+    return {"ok": True}
+
+
+@app.post("/api/reset")
+async def reset():
+    store.reset()
+    return {"ok": True}
 
 
 @app.post("/api/agents/{agent_id}/revoke")

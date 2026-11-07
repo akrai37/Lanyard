@@ -5,3 +5,4 @@ __pycache__/
 .tokens/
 *.db-shm
 *.db-wal
+logs/

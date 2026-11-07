@@ -40,7 +40,7 @@ def main():
     args = ap.parse_args()
 
     token = get_token(args.agent)
-    client = httpx.Client(timeout=30, headers={
+    client = httpx.Client(timeout=180, headers={
         "authorization": f"Bearer {token}",
         "accept": "application/json, text/event-stream",
     })
@@ -64,8 +64,10 @@ def main():
 
     for name, arguments in STEPS:
         time.sleep(args.delay)
-        r = rpc("tools/call", {"name": name, "arguments": arguments})
         label = f"{name}({', '.join(f'{k}={v!r}' for k, v in arguments.items() if k != 'content')})"
+        if arguments.get("environment") == "production":
+            print(f"{DIM}… {label}: high-risk, waiting for human approval in the dashboard{RESET}")
+        r = rpc("tools/call", {"name": name, "arguments": arguments})
         if r.status_code == 403:
             print(f"{RED}✗ {label}  →  HTTP 403: {r.json()['error']['message']}{RESET}")
             print(f"\n{RED}{BOLD}Agent stopped: Lanyard revoked its access mid-task.{RESET}")

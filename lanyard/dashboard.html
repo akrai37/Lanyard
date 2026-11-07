@@ -9,12 +9,14 @@
     --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280; --line: #e5e7eb;
     --allow: #15803d; --allow-bg: #dcfce7; --deny: #b91c1c; --deny-bg: #fee2e2;
     --admin: #1d4ed8; --admin-bg: #dbeafe; --off: #9ca3af; --off-bg: #f3f4f6; --accent: #111827;
+    --pending: #b45309; --pending-bg: #fef3c7;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0d1117; --panel: #161b22; --text: #e6edf3; --muted: #8b949e; --line: #30363d;
       --allow: #3fb950; --allow-bg: #12261a; --deny: #f85149; --deny-bg: #2d1416;
       --admin: #58a6ff; --admin-bg: #102038; --off: #6e7681; --off-bg: #1c2128; --accent: #e6edf3;
+      --pending: #e3b341; --pending-bg: #2e2510;
     }
   }
   * { box-sizing: border-box; }
@@ -58,6 +60,12 @@
   .pill.allow { color: var(--allow); background: var(--allow-bg); }
   .pill.deny, .pill.error { color: var(--deny); background: var(--deny-bg); }
   .pill.admin { color: var(--admin); background: var(--admin-bg); }
+  .pill.pending { color: var(--pending); background: var(--pending-bg); }
+  .approval { border-color: var(--pending); background: var(--pending-bg); animation: pulse 1.4s ease-in-out infinite; }
+  .approval .what { font-family: ui-monospace, Menlo, monospace; font-size: 13px; margin: 8px 0 12px; word-break: break-word; }
+  .approval button.approve { background: var(--allow); color: #fff; border-color: var(--allow); font-weight: 600; }
+  .approval button.deny { background: var(--deny); color: #fff; border-color: var(--deny); font-weight: 600; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--pending-bg); } }
   tr.fresh { animation: flash 1.6s ease-out; }
   @keyframes flash { from { background: var(--admin-bg); } to { background: transparent; } }
   .feed { max-height: calc(100vh - 150px); overflow: auto; }
@@ -76,6 +84,7 @@
 </header>
 <main>
   <section>
+    <div id="approvals"></div>
     <h2>Agents</h2>
     <div id="agents"><div class="card hint">No agents yet. They appear here after their first request.</div></div>
     <p class="hint">Click a green tool to block it for that agent; click again to allow. Changes apply on the agent's next call.</p>
@@ -124,6 +133,22 @@ function renderAgents(agents) {
   }).join("");
 }
 
+function renderApprovals(approvals) {
+  const el = document.getElementById("approvals");
+  const html = approvals.length ? `<h2>Needs your approval</h2>` + approvals.map(a => {
+    const args = Object.entries(a.arguments).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ");
+    return `<div class="card approval">
+      <div class="row"><span class="name">${esc(a.agent_name)}</span><span class="hint">waiting ${ago(a.ts).replace(" ago", "")}</span></div>
+      <div class="what">${esc(a.tool)}(${esc(args)})</div>
+      <div class="row">
+        <button class="approve" onclick="post('/api/approvals/${a.id}/approve')">Approve</button>
+        <button class="deny" onclick="post('/api/approvals/${a.id}/deny')">Deny</button>
+      </div>
+    </div>`;
+  }).join("") : "";
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+
 function renderEvents(events) {
   if (!events.length) return;
   const body = document.getElementById("events");
@@ -146,6 +171,8 @@ async function tick() {
   try {
     const r = await fetch(`/api/state?after=${lastId}`);
     const s = await r.json();
+    if (lastId > 0 && !s.agents.length) { location.reload(); return; }  // state was reset
+    renderApprovals(s.approvals || []);
     renderAgents(s.agents);
     renderEvents(s.events);
     first = false;

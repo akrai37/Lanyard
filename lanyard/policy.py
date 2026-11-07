@@ -15,3 +15,16 @@ TOOL_SCOPES = {
     "deploy_service": "deploy:run",
     "rollback_service": "deploy:run",
 }
+
+# Calls that also need a human to click Approve on the dashboard, even when the
+# agent has the scope. A rule matches when every listed argument has that value.
+APPROVAL_RULES = {
+    "deploy_service": {"environment": "production"},
+    "rollback_service": {"environment": "production"},
+}
+APPROVAL_TIMEOUT_SECONDS = 120
+
+
+def needs_approval(tool: str, arguments: dict) -> bool:
+    rule = APPROVAL_RULES.get(tool)
+    return rule is not None and all(arguments.get(k) == v for k, v in rule.items())
