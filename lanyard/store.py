@@ -66,6 +66,9 @@ class SQLiteStore:
     def restore(self, agent_id: str) -> None:
         self._q("DELETE FROM revocations WHERE agent_id=?", (agent_id,))
 
+    def revocations(self) -> list[dict]:
+        return [r for r in (self.revocation(row["agent_id"]) for row in self._q("SELECT agent_id FROM revocations")) if r]
+
     def revocation(self, agent_id: str) -> dict | None:
         rows = self._q("SELECT * FROM revocations WHERE agent_id=?", (agent_id,))
         if not rows:

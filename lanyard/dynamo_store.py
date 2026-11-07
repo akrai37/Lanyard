@@ -83,6 +83,9 @@ class DynamoStore:
     def restore(self, agent_id: str) -> None:
         self._t.delete_item(Key={"pk": "revoked", "sk": agent_id})
 
+    def revocations(self) -> list[dict]:
+        return [r for r in (self.revocation(i["sk"]) for i in self._query("revoked")) if r]
+
     def revocation(self, agent_id: str) -> dict | None:
         r = self._get("revoked", agent_id)
         if not r:

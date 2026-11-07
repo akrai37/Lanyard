@@ -432,8 +432,15 @@ async def policy():
 
 @app.post("/api/reset")
 async def reset():
+    # Give revoked agents their Auth0 grants back first, or a reset would strand them.
+    restored = 0
+    if auth0_admin:
+        for rev in store.revocations():
+            if rev.get("grant_scopes") is not None:
+                await auth0_admin.restore_grant(rev["agent_id"], rev["grant_scopes"])
+                restored += 1
     store.reset()
-    return {"ok": True}
+    return {"ok": True, "auth0_grants_restored": restored}
 
 
 @app.post("/api/agents/{agent_id}/revoke")
