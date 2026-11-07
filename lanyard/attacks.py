@@ -71,7 +71,7 @@ async def run_attack(attack_id: str, base: str, http: httpx.AsyncClient, ctx: di
     if attack_id == "scope-bypass":
         status, text, err = await tool(ctx["mint"](["files:read"]), "deploy_service",
                                        {"service": "payments-api", "version": "6.6.6", "environment": "production"})
-        return {"blocked": err and "requires scope" in text, "observed": text}
+        return {"blocked": err and ("requires scope" in text or "default deny" in text), "observed": text}
 
     if attack_id == "unknown-tool":
         status, text, err = await tool(ctx["mint"](["files:read"]), "delete_file", {"path": "customers.csv"})

@@ -204,6 +204,9 @@ def main():
         {"Effect": "Allow", "Action": "lambda:InvokeFunction",
          "Resource": [f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:lanyard-files",
                       f"arn:aws:lambda:{REGION}:{ACCOUNT}:function:lanyard-deploy"]},
+        {"Effect": "Allow", "Action": ["verifiedpermissions:IsAuthorized", "verifiedpermissions:ListPolicies",
+                                       "verifiedpermissions:GetPolicy"],
+         "Resource": f"arn:aws:verifiedpermissions::{ACCOUNT}:policy-store/*"},
         {"Effect": "Allow", "Action": "bedrock:ApplyGuardrail",
          "Resource": f"arn:aws:bedrock:{REGION}:{ACCOUNT}:guardrail/*"},
     ]})
@@ -221,6 +224,7 @@ def main():
         "LANYARD_SECRET_ID": "lanyard/gateway",
         "LANYARD_AWS_ACCOUNT": ACCOUNT,
         "LANYARD_AUDIT_BUCKET": AUDIT_BUCKET,
+        **({"LANYARD_AVP_POLICY_STORE": ENV["LANYARD_AVP_POLICY_STORE"]} if ENV.get("LANYARD_AVP_POLICY_STORE") else {}),
         "LANYARD_FILES_BUCKET": FILES_BUCKET,
     }
     for k, v in ENV.items():  # client IDs only (for display names), never secrets

@@ -651,6 +651,7 @@ const VIEWS = {
               <dt>Revocation key</dt><dd>The agent's identity (client ID or IAM role), not its token</dd>
             </dl></div>
           <div class="panel"><div class="panel-h"><h3>Safeguards</h3></div><div class="checks">
+            ${check(true, "Policy engine: " + esc(p.policy_engine), p.cedar_policies && p.cedar_policies.length ? "AWS evaluates Cedar policies on every tool call; if it can't answer, the call is denied" : "Rules built into the gateway")}
             ${check(true, "Default deny", "Tools without a rule cannot be called")}
             ${check(true, "Revocation checked on every call", `Shared state in ${esc(p.store)}${p.store === "DynamoDB" ? " with strongly consistent reads" : ""}`)}
             ${check(p.auth0_cutoff, "Cut off at Auth0 on revoke", p.auth0_cutoff ? "Revoking also removes the agent's Auth0 grant" : "Not configured: revocation applies at the gateway only")}
@@ -665,6 +666,12 @@ const VIEWS = {
           <div class="tablewrap"><table><thead><tr><th>Tool</th><th>Server</th><th>Required permission</th><th>Needs human approval</th></tr></thead><tbody>
           ${p.tools.map(t => `<tr><td class="mono">${esc(t.name)}</td><td>${esc(t.server || "–")}</td><td><span class="scope">${esc(t.scope)}</span></td><td>${rule(t.approval)}</td></tr>`).join("")}
           </tbody></table></div></div>
+        ${p.cedar_policies && p.cedar_policies.length ? `<div class="panel"><div class="panel-h"><h3>Cedar policies</h3><span class="sub">Amazon Verified Permissions · edits in AWS apply within a minute</span></div>
+          <div style="display:grid;gap:12px">${p.cedar_policies.map(c => {
+            const kind = c.description.split(":")[0];
+            const pillc = kind === "permit" ? "allow" : kind === "approval" ? "pending" : "deny";
+            return `<div><div class="row" style="margin-bottom:6px"><span class="pill ${pillc}">${esc(kind)}</span><span>${esc(c.description.split(": ").slice(1).join(": "))}</span></div><pre class="json" style="background:var(--hover);border:1px solid var(--line);border-radius:8px;padding:10px 12px">${esc(c.statement)}</pre></div>`;
+          }).join("")}</div></div>` : ""}
         ${p.workloads.length ? `<div class="panel"><div class="panel-h"><h3>Workload identities</h3><span class="sub">AWS roles that sign in without a stored secret</span></div>
           <div class="tablewrap"><table><thead><tr><th>IAM role</th><th>Agent</th><th>Permissions</th></tr></thead><tbody>
           ${p.workloads.map(w => `<tr><td class="mono">${esc(w.role)}</td><td>${esc(w.name)}</td><td><div class="scopes">${w.scopes.map(s => `<span class="scope">${esc(s)}</span>`).join("")}</div></td></tr>`).join("")}

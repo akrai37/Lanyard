@@ -70,6 +70,12 @@ app = FastAPI(title="Lanyard")
 SIGNING_KEY = ENV.get("LANYARD_SIGNING_KEY")
 AWS_ACCOUNT = ENV.get("LANYARD_AWS_ACCOUNT")
 
+# Optional: Amazon Verified Permissions (Cedar) makes the authorization decisions. Fails closed.
+avp = None
+if ENV.get("LANYARD_AVP_POLICY_STORE"):
+    from .avp import VerifiedPermissions
+    avp = VerifiedPermissions(ENV["LANYARD_AVP_POLICY_STORE"], AWS_PROFILE, AWS_REGION)
+
 # Optional: also remove a revoked agent's grant in Auth0, so it cannot get new tokens.
 auth0_admin = (Auth0Admin(DOMAIN, ENV["AUTH0_ADMIN_CLIENT_ID"], ENV["AUTH0_ADMIN_CLIENT_SECRET"], AUDIENCE, http)
                if ENV.get("AUTH0_ADMIN_CLIENT_ID") and ENV.get("AUTH0_ADMIN_CLIENT_SECRET") else None)
@@ -269,20 +275,36 @@ async def mcp_endpoint(request: Request):
 
     # 4. tools/call: authorize, then forward
     if method == "tools/call":
-        ok, reason = tool_decision(tool, scopes, blocked)
-        if not ok:
-            log("deny", reason, arguments=params.get("arguments"))
-            return rpc_result(rid, denied_tool_result(f"Lanyard denied this call: {reason}."))
-
-        # high-risk call: hold it until a human approves or denies on the dashboard.
-        # A tainted agent (it has read a prompt injection) needs approval for any risky tool.
         arguments = params.get("arguments") or {}
         taint = next((t for t in (store.taint_of(a) for a in chain + [agent_id]) if t), None)
-        tainted_risk = taint is not None and TOOL_SCOPES.get(tool) in RISKY_SCOPES
-        if needs_approval(tool, arguments) or tainted_risk:
-            approval_id = store.request_approval(agent_id, name, tool, arguments)
+
+        if avp:
+            # Amazon Verified Permissions decides, using Lanyard's Cedar policies.
+            avp_agent = {"id": agent_id, "scopes": scopes, "tainted": taint is not None,
+                         "isSubAgent": bool(chain), "identity": claims.get("lanyard_identity", "auth0")}
+            avp_tool = {"name": tool or "", "requiredScope": TOOL_SCOPES.get(tool, "__unlisted__"),
+                        "risky": TOOL_SCOPES.get(tool) in RISKY_SCOPES}
+            avp_ctx = {"environment": str(arguments.get("environment", "")), "adminBlocked": tool in blocked}
+            decision = await avp.decide(avp_agent, avp_tool, avp_ctx | {"humanApproved": False})
+            if not decision.allow and not decision.needs_approval:
+                log("deny", decision.reason, arguments=arguments)
+                return rpc_result(rid, denied_tool_result(f"Lanyard denied this call: {decision.reason}."))
+            reason, hold = decision.reason, decision.needs_approval
+            why = f"needs human approval ({decision.reason})"
+        else:
+            # Built-in rules (no policy store configured).
+            ok, reason = tool_decision(tool, scopes, blocked)
+            if not ok:
+                log("deny", reason, arguments=arguments)
+                return rpc_result(rid, denied_tool_result(f"Lanyard denied this call: {reason}."))
+            tainted_risk = taint is not None and TOOL_SCOPES.get(tool) in RISKY_SCOPES
+            hold = needs_approval(tool, arguments) or tainted_risk
             why = ("tainted agent (read a prompt injection): risky call needs human approval" if tainted_risk
                    and not needs_approval(tool, arguments) else "high-risk call: waiting for human approval")
+
+        # Hold the call until a human approves or denies it on the dashboard.
+        if hold:
+            approval_id = store.request_approval(agent_id, name, tool, arguments)
             log("pending", why, arguments=arguments, approval_id=approval_id)
             deadline = time.monotonic() + APPROVAL_TIMEOUT_SECONDS
             status = "pending"
@@ -302,6 +324,12 @@ async def mcp_endpoint(request: Request):
                 log("deny", "denied by human reviewer", arguments=arguments)
                 return rpc_result(rid, denied_tool_result(
                     "Lanyard denied this call: a human reviewer rejected it."))
+            if avp:  # ask again, now with the human's approval in the context
+                decision = await avp.decide(avp_agent, avp_tool, avp_ctx | {"humanApproved": True})
+                if not decision.allow:
+                    log("deny", f"approved by human, but {decision.reason}", arguments=arguments)
+                    return rpc_result(rid, denied_tool_result(f"Lanyard denied this call: {decision.reason}."))
+                reason = decision.reason
             reason += "; approved by human"
         catalog = await tool_catalog()
         if tool not in catalog:
@@ -496,6 +524,15 @@ async def decide(approval_id: int, decision: str):
     return {"ok": True}
 
 
+def _cedar_policies() -> list[dict]:
+    if not avp:
+        return []
+    try:
+        return [{"id": k} | v for k, v in sorted(avp.policies().items(), key=lambda kv: kv[1]["description"])]
+    except Exception:
+        return []
+
+
 @app.get("/api/policy")
 async def policy():
     from .policy import APPROVAL_RULES
@@ -518,6 +555,8 @@ async def policy():
         "environment": "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local",
         "approval_timeout": APPROVAL_TIMEOUT_SECONDS,
         "risky_scopes": sorted(RISKY_SCOPES),
+        "policy_engine": "Amazon Verified Permissions (Cedar)" if avp else "Built-in rules",
+        "cedar_policies": _cedar_policies(),
         "audit_archive": ENV.get("LANYARD_AUDIT_BUCKET"),
         "files_bucket": ENV.get("LANYARD_FILES_BUCKET"),
         "max_delegation_depth": MAX_DELEGATION_DEPTH,
