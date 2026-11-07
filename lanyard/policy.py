@@ -31,6 +31,8 @@ WORKLOAD_IDENTITIES = {
     "lanyard-worker-role": {"name": "aws-worker-agent", "scopes": ["files:read", "deploy:run"]},
     # The hackathon participant role, so a laptop with event credentials can demo the flow
     "WSParticipantRole": {"name": "laptop-aws-agent", "scopes": ["files:read"]},
+    # Claude Opus 5.5 on Amazon Bedrock, running as a Lambda (lanyard/ai_agent.py)
+    "lanyard-ai-agent-role": {"name": "ai-triage-agent", "scopes": ["files:read", "files:write"]},
     # Simulated agents (lanyard/simulator.py), each with its own role
     "lanyard-sim-billing": {"name": "billing-bot", "scopes": ["files:read"]},
     "lanyard-sim-support": {"name": "support-assistant", "scopes": ["files:read"]},

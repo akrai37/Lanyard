@@ -236,6 +236,13 @@ def main():
     function("lanyard-worker", worker_role, "lanyard.worker_handler.handler",
              {"LANYARD_URL": url, "LANYARD_AUDIENCE": ENV["AUTH0_AUDIENCE"]}, timeout=300)
 
+    print("AI agent (Claude Opus 5.5 on Bedrock)")
+    ai_role = role("lanyard-ai-agent-role", {"Version": "2012-10-17", "Statement": [
+        {"Effect": "Allow", "Action": ["bedrock-mantle:*", "bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+         "Resource": "*"}]})
+    function("lanyard-ai-agent", ai_role, "lanyard.ai_agent.handler",
+             {"LANYARD_URL": url, "LANYARD_AUDIENCE": ENV["AUTH0_AUDIENCE"]}, timeout=900)
+
     print("Traffic simulator")
     sim_role = role("lanyard-simulator-role", {"Version": "2012-10-17", "Statement": [
         {"Effect": "Allow", "Action": "sts:AssumeRole", "Resource": f"arn:aws:iam::{ACCOUNT}:role/lanyard-sim-*"}]})
