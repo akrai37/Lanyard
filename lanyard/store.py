@@ -22,9 +22,9 @@ class SQLiteStore:
             self._db.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS agents (
-                    agent_id TEXT PRIMARY KEY, name TEXT, scopes TEXT, last_seen REAL);
+                    agent_id TEXT PRIMARY KEY, name TEXT, scopes TEXT, last_seen REAL, identity TEXT);
                 CREATE TABLE IF NOT EXISTS revocations (
-                    agent_id TEXT PRIMARY KEY, revoked_at REAL, reason TEXT);
+                    agent_id TEXT PRIMARY KEY, revoked_at REAL, reason TEXT, grant_scopes TEXT);
                 CREATE TABLE IF NOT EXISTS tool_blocks (
                     agent_id TEXT, tool TEXT, PRIMARY KEY (agent_id, tool));
                 CREATE TABLE IF NOT EXISTS approvals (
@@ -35,32 +35,44 @@ class SQLiteStore:
                     method TEXT, tool TEXT, decision TEXT, reason TEXT, latency_ms INTEGER, detail TEXT);
                 """
             )
+            for table, column in (("agents", "identity"), ("revocations", "grant_scopes")):
+                try:  # upgrade databases created before these columns existed
+                    self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+                except sqlite3.OperationalError:
+                    pass
 
     def _q(self, sql: str, args: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:
             return self._db.execute(sql, args).fetchall()
 
     # agents
-    def seen_agent(self, agent_id: str, name: str, scopes: list[str]) -> None:
+    def seen_agent(self, agent_id: str, name: str, scopes: list[str], identity: str = "auth0") -> None:
         self._q(
-            "INSERT INTO agents VALUES (?,?,?,?) ON CONFLICT(agent_id) DO UPDATE SET "
-            "name=excluded.name, scopes=excluded.scopes, last_seen=excluded.last_seen",
-            (agent_id, name, " ".join(scopes), time.time()),
+            "INSERT INTO agents (agent_id, name, scopes, last_seen, identity) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(agent_id) DO UPDATE SET name=excluded.name, scopes=excluded.scopes, "
+            "last_seen=excluded.last_seen, identity=excluded.identity",
+            (agent_id, name, " ".join(scopes), time.time(), identity),
         )
 
     def agents(self) -> list[dict]:
         return [dict(r) for r in self._q("SELECT * FROM agents ORDER BY name")]
 
     # revocation
-    def revoke(self, agent_id: str, reason: str = "revoked by admin") -> None:
-        self._q("INSERT OR REPLACE INTO revocations VALUES (?,?,?)", (agent_id, time.time(), reason))
+    def revoke(self, agent_id: str, reason: str = "revoked by admin", grant_scopes: list[str] | None = None) -> None:
+        """grant_scopes: the Auth0 grant removed at revocation time, kept so restore can recreate it."""
+        self._q("INSERT OR REPLACE INTO revocations (agent_id, revoked_at, reason, grant_scopes) VALUES (?,?,?,?)",
+                (agent_id, time.time(), reason, json.dumps(grant_scopes) if grant_scopes is not None else None))
 
     def restore(self, agent_id: str) -> None:
         self._q("DELETE FROM revocations WHERE agent_id=?", (agent_id,))
 
     def revocation(self, agent_id: str) -> dict | None:
         rows = self._q("SELECT * FROM revocations WHERE agent_id=?", (agent_id,))
-        return dict(rows[0]) if rows else None
+        if not rows:
+            return None
+        r = dict(rows[0])
+        r["grant_scopes"] = json.loads(r["grant_scopes"]) if r.get("grant_scopes") else None
+        return r
 
     # admin tool blocks (narrow an agent's access below its token scopes)
     def toggle_tool_block(self, agent_id: str, tool: str) -> bool:

@@ -65,25 +65,31 @@ class DynamoStore:
         return Decimal(str(round(time.time(), 3)))
 
     # agents
-    def seen_agent(self, agent_id: str, name: str, scopes: list[str]) -> None:
+    def seen_agent(self, agent_id: str, name: str, scopes: list[str], identity: str = "auth0") -> None:
         self._t.put_item(Item={"pk": "agent", "sk": agent_id, "agent_id": agent_id, "name": name,
-                               "scopes": " ".join(scopes), "last_seen": self._now()})
+                               "scopes": " ".join(scopes), "last_seen": self._now(), "identity": identity})
 
     def agents(self) -> list[dict]:
         return sorted(({k: v for k, v in a.items() if k not in ("pk", "sk")} for a in self._query("agent")),
                       key=lambda a: a["name"])
 
     # revocation
-    def revoke(self, agent_id: str, reason: str = "revoked by admin") -> None:
-        self._t.put_item(Item={"pk": "revoked", "sk": agent_id, "agent_id": agent_id,
-                               "revoked_at": self._now(), "reason": reason})
+    def revoke(self, agent_id: str, reason: str = "revoked by admin", grant_scopes: list[str] | None = None) -> None:
+        item = {"pk": "revoked", "sk": agent_id, "agent_id": agent_id, "revoked_at": self._now(), "reason": reason}
+        if grant_scopes is not None:
+            item["grant_scopes"] = json.dumps(grant_scopes)
+        self._t.put_item(Item=item)
 
     def restore(self, agent_id: str) -> None:
         self._t.delete_item(Key={"pk": "revoked", "sk": agent_id})
 
     def revocation(self, agent_id: str) -> dict | None:
         r = self._get("revoked", agent_id)
-        return {k: v for k, v in r.items() if k not in ("pk", "sk")} if r else None
+        if not r:
+            return None
+        r = {k: v for k, v in r.items() if k not in ("pk", "sk")}
+        r["grant_scopes"] = json.loads(r["grant_scopes"]) if r.get("grant_scopes") else None
+        return r
 
     # admin tool blocks
     def toggle_tool_block(self, agent_id: str, tool: str) -> bool:

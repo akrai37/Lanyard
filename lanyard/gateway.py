@@ -23,12 +23,21 @@ from dotenv import dotenv_values
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
+from . import workload
+from .auth0_admin import Auth0Admin
 from .guardrails import ToolResponseGuard
-from .policy import APPROVAL_TIMEOUT_SECONDS, BACKENDS, TOOL_SCOPES, needs_approval
+from .policy import APPROVAL_TIMEOUT_SECONDS, BACKENDS, TOOL_SCOPES, WORKLOAD_IDENTITIES, needs_approval
 from .store import SQLiteStore
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV = {**dotenv_values(ROOT / ".env"), **os.environ}
+
+# In the cloud, secrets come from AWS Secrets Manager rather than environment variables.
+if ENV.get("LANYARD_SECRET_ID"):
+    _sm = boto3.Session(profile_name=ENV.get("AWS_PROFILE") or None,
+                        region_name=ENV.get("AWS_REGION", "us-east-1")).client("secretsmanager")
+    ENV.update(json.loads(_sm.get_secret_value(SecretId=ENV["LANYARD_SECRET_ID"])["SecretString"]))
+
 DOMAIN = ENV["AUTH0_DOMAIN"]
 AUDIENCE = ENV["AUTH0_AUDIENCE"]
 ISSUER = f"https://{DOMAIN}/"
@@ -56,12 +65,29 @@ http = httpx.AsyncClient(timeout=30)
 _lambda = None
 app = FastAPI(title="Lanyard")
 
+# Workload identity (AWS IAM roles): Lanyard signs its own short-lived tokens with this key.
+SIGNING_KEY = ENV.get("LANYARD_SIGNING_KEY")
+AWS_ACCOUNT = ENV.get("LANYARD_AWS_ACCOUNT")
+
+# Optional: also remove a revoked agent's grant in Auth0, so it cannot get new tokens.
+auth0_admin = (Auth0Admin(DOMAIN, ENV["AUTH0_ADMIN_CLIENT_ID"], ENV["AUTH0_ADMIN_CLIENT_SECRET"], AUDIENCE, http)
+               if ENV.get("AUTH0_ADMIN_CLIENT_ID") and ENV.get("AUTH0_ADMIN_CLIENT_SECRET") else None)
+
+
+def agent_name(agent_id: str) -> str:
+    if agent_id in AGENT_NAMES:
+        return AGENT_NAMES[agent_id]
+    for a in store.agents():
+        if a["agent_id"] == agent_id:
+            return a["name"]
+    return agent_id[:10]
+
 
 @app.middleware("http")
 async def admin_auth(request: Request, call_next):
     """Dashboard and admin API require a password when LANYARD_ADMIN_PASSWORD is set.
     The /mcp endpoint is protected separately, by the agent's JWT."""
-    if ADMIN_PASSWORD and not request.url.path.startswith("/mcp"):
+    if ADMIN_PASSWORD and not request.url.path.startswith(("/mcp", "/auth/")):
         ok = False
         auth = request.headers.get("authorization", "")
         if auth.lower().startswith("basic "):
@@ -102,6 +128,13 @@ def denied_tool_result(message):
 
 
 async def verify_token(token: str) -> dict:
+    """Two trusted issuers, each pinned to its own algorithm and key:
+    Auth0 (RS256, public JWKS) and Lanyard itself for workload identities (HS256, private key)."""
+    issuer = jwt.decode(token, options={"verify_signature": False}).get("iss")
+    if issuer == workload.LANYARD_ISSUER:
+        if not SIGNING_KEY:
+            raise jwt.InvalidTokenError("workload identity is not enabled")
+        return jwt.decode(token, SIGNING_KEY, algorithms=["HS256"], audience=AUDIENCE, issuer=workload.LANYARD_ISSUER)
     key = await asyncio.to_thread(jwks.get_signing_key_from_jwt, token)
     return jwt.decode(token, key.key, algorithms=["RS256"], audience=AUDIENCE, issuer=ISSUER)
 
@@ -177,9 +210,9 @@ async def mcp_endpoint(request: Request):
                          headers={"WWW-Authenticate": 'Bearer error="invalid_token"'})
 
     agent_id = claims.get("azp") or claims["sub"]
-    name = AGENT_NAMES.get(agent_id, agent_id[:10])
+    name = claims.get("lanyard_name") or AGENT_NAMES.get(agent_id, agent_id[:10])
     scopes = set(claims.get("scope", "").split())
-    store.seen_agent(agent_id, name, sorted(scopes))
+    store.seen_agent(agent_id, name, sorted(scopes), claims.get("lanyard_identity", "auth0"))
 
     def log(decision, reason, **detail):
         store.log(agent_id=agent_id, agent_name=name, method=method, tool=tool, decision=decision,
@@ -294,6 +327,40 @@ async def mcp_endpoint(request: Request):
     return rpc_error(rid, -32601, f"method not supported: {method}")
 
 
+@app.post("/auth/aws")
+async def auth_aws(request: Request):
+    """Workload identity: exchange a signed sts:GetCallerIdentity request for a short-lived Lanyard token."""
+    if not (SIGNING_KEY and AWS_ACCOUNT):
+        return JSONResponse({"error": "workload identity is not enabled"}, status_code=404)
+    t0 = time.perf_counter()
+
+    def log(decision, reason, agent_id="unknown", name="unknown", **detail):
+        store.log(agent_id=agent_id, agent_name=name, method="auth/aws", tool=None, decision=decision,
+                  reason=reason, latency_ms=int((time.perf_counter() - t0) * 1000), detail=detail)
+
+    try:
+        arn = await workload.verify_identity_proof(await request.json(), AUDIENCE, http)
+    except (workload.WorkloadAuthError, ValueError) as e:
+        log("deny", f"workload sign-in failed: {e}")
+        return JSONResponse({"error": str(e)}, status_code=401)
+
+    parsed = workload.role_from_arn(arn)
+    mapping = WORKLOAD_IDENTITIES.get(parsed[1]) if parsed and parsed[0] == AWS_ACCOUNT else None
+    if not mapping:
+        log("deny", "AWS identity verified but not registered with Lanyard", arn=arn)
+        return JSONResponse({"error": "this AWS identity is not registered with Lanyard"}, status_code=403)
+
+    agent_id = f"aws:{parsed[0]}:{parsed[1]}"
+    if store.revocation(agent_id):
+        log("deny", "token request refused: identity revoked", agent_id, mapping["name"], arn=arn)
+        return JSONResponse({"error": "this identity has been revoked"}, status_code=403)
+
+    token, ttl = workload.issue_token(SIGNING_KEY, AUDIENCE, agent_id, mapping["name"], mapping["scopes"], arn)
+    store.seen_agent(agent_id, mapping["name"], sorted(mapping["scopes"]), "aws-iam")
+    log("allow", f"AWS IAM identity verified; issued {ttl // 60}-minute token", agent_id, mapping["name"], arn=arn)
+    return {"access_token": token, "token_type": "Bearer", "expires_in": ttl}
+
+
 @app.get("/mcp")
 async def mcp_get():
     # We do not offer a server-initiated SSE stream; the spec allows 405 here.
@@ -346,24 +413,44 @@ async def reset():
 
 @app.post("/api/agents/{agent_id}/revoke")
 async def revoke(agent_id: str):
+    # Block at the gateway first: this is what stops the very next call.
     store.revoke(agent_id)
-    store.log(agent_id=agent_id, agent_name=AGENT_NAMES.get(agent_id, agent_id[:10]), method="admin",
-              tool=None, decision="admin", reason="agent revoked")
+    reason = "agent revoked at gateway"
+    if agent_id.startswith("aws:"):
+        reason += "; Lanyard will not issue it new tokens"
+    elif auth0_admin:
+        try:
+            scopes = await auth0_admin.remove_grant(agent_id)
+            if scopes is not None:
+                store.revoke(agent_id, grant_scopes=scopes)
+                reason += "; Auth0 grant removed, no new tokens can be issued"
+        except httpx.HTTPError as e:
+            reason += f"; Auth0 grant removal failed ({type(e).__name__})"
+    store.log(agent_id=agent_id, agent_name=agent_name(agent_id), method="admin", tool=None,
+              decision="admin", reason=reason)
     return {"ok": True}
 
 
 @app.post("/api/agents/{agent_id}/restore")
 async def restore(agent_id: str):
+    rev = store.revocation(agent_id)
+    reason = "access restored"
+    if rev and rev.get("grant_scopes") is not None and auth0_admin:
+        try:
+            await auth0_admin.restore_grant(agent_id, rev["grant_scopes"])
+            reason += "; Auth0 grant recreated"
+        except httpx.HTTPError as e:
+            reason += f"; Auth0 grant restore failed ({type(e).__name__})"
     store.restore(agent_id)
-    store.log(agent_id=agent_id, agent_name=AGENT_NAMES.get(agent_id, agent_id[:10]), method="admin",
-              tool=None, decision="admin", reason="access restored")
+    store.log(agent_id=agent_id, agent_name=agent_name(agent_id), method="admin", tool=None,
+              decision="admin", reason=reason)
     return {"ok": True}
 
 
 @app.post("/api/agents/{agent_id}/tools/{tool}/toggle")
 async def toggle_tool(agent_id: str, tool: str):
     now_blocked = store.toggle_tool_block(agent_id, tool)
-    store.log(agent_id=agent_id, agent_name=AGENT_NAMES.get(agent_id, agent_id[:10]), method="admin",
+    store.log(agent_id=agent_id, agent_name=agent_name(agent_id), method="admin",
               tool=tool, decision="admin", reason="tool blocked" if now_blocked else "tool unblocked")
     return {"blocked": now_blocked}
 

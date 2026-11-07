@@ -24,6 +24,15 @@ APPROVAL_RULES = {
 }
 APPROVAL_TIMEOUT_SECONDS = 120
 
+# Workload identities: AWS IAM roles that may sign in without any stored secret.
+# Only roles in LANYARD_AWS_ACCOUNT (set in the environment) are accepted.
+WORKLOAD_IDENTITIES = {
+    # An agent running on AWS Lambda with its own role
+    "lanyard-worker-role": {"name": "aws-worker-agent", "scopes": ["files:read", "deploy:run"]},
+    # The hackathon participant role, so a laptop with event credentials can demo the flow
+    "WSParticipantRole": {"name": "laptop-aws-agent", "scopes": ["files:read"]},
+}
+
 
 def needs_approval(tool: str, arguments: dict) -> bool:
     rule = APPROVAL_RULES.get(tool)
