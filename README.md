@@ -11,12 +11,15 @@ Lanyard is a gateway between AI agents and their [MCP](https://modelcontextproto
 | | |
 |---|---|
 | **Agent identity** | Each agent authenticates with OAuth 2.0 client credentials against Auth0 (Okta) and presents a signed JWT on every request. |
+| **Workload identity** | Agents running on AWS sign in with their IAM role and hold no secret at all. The agent signs an `sts:GetCallerIdentity` request bound to Lanyard; Lanyard has AWS verify it, maps the role to an agent identity, and issues a 10-minute token. |
 | **Least privilege** | Token scopes map to tools. `tools/list` only returns the tools an agent may call, and `tools/call` is enforced again server side. Unknown tools are denied by default. |
-| **Instant revocation** | Revocation is keyed on the agent's identity (`client_id`), not the token, and is checked on every request. A revoked agent gets HTTP 403 on its next call, and fetching a new token does not help. |
+| **Instant revocation** | Revocation is keyed on the agent's identity (Auth0 client ID or IAM role), not the token, and is checked on every request. A revoked agent gets HTTP 403 on its next call, and fetching a new token does not help. |
+| **Cut off at the source** | Revoking also removes the agent's grant in Auth0 (through the Management API), so Auth0 stops issuing it tokens; Restore recreates the grant. Revoked workload identities are refused new Lanyard tokens. |
 | **Per-tool admin control** | An admin can block a single tool for a single agent from the dashboard, narrowing access below what the token allows. |
 | **Human approval** | High-risk calls, such as production deploys, are held until a person approves or denies them on the dashboard. |
 | **Tool-response guardrails** | Tool output is scanned with Amazon Bedrock Guardrails before the agent's model sees it. Prompt injection hidden in data, such as a poisoned file, is blocked; emails and phone numbers are masked. |
-| **Audit trail** | Every decision is logged with the agent, tool, arguments, outcome and reason, and streamed to a live dashboard. |
+| **Admin console** | Live overview with decision charts, per-agent identity and tool access, an approval queue, a searchable audit log with CSV export, and the active policy. |
+| **Audit trail** | Every decision is logged with the agent, tool, arguments, outcome and reason. |
 
 ## Architecture
 
@@ -24,6 +27,7 @@ Lanyard is a gateway between AI agents and their [MCP](https://modelcontextproto
 flowchart LR
     A["AI agent<br/>(Claude Code, Kiro, scripted)"] -- "MCP + Bearer JWT" --> G
     I["Auth0<br/>identity provider"] -. "client credentials → JWT" .-> A
+    W["Agent on AWS<br/>(IAM role, no secret)"] -- "signed GetCallerIdentity → 10-min token" --> G
     subgraph G["Lanyard gateway"]
         direction TB
         V["1. Verify JWT<br/>(JWKS, issuer, audience, expiry)"] --> R["2. Revoked?"]
@@ -41,7 +45,9 @@ The gateway holds no state of its own. Revocations, admin blocks, pending approv
 
 ## Security decisions
 
-- **Revoke the identity, not the token.** JWTs cannot be recalled, and an agent with client credentials can always mint a new one. Lanyard keys revocation on the `azp` (client ID) claim and checks it on every request.
+- **Revoke the identity, not the token.** JWTs cannot be recalled, and an agent with client credentials can always mint a new one. Lanyard keys revocation on the `azp` (client ID) claim and checks it on every request, and also removes the agent's grant at Auth0 so no new token can be minted.
+- **No secrets for workloads.** An agent on AWS proves its identity with a SigV4 signature from its IAM role. The signed request must carry Lanyard's audience header inside the signature, so it cannot be replayed against another service, and Lanyard only accepts roles in its own AWS account. Lanyard never sees the agent's AWS credentials.
+- **Two issuers, each pinned.** Auth0 tokens are verified only with RS256 and Auth0's public keys; Lanyard's own workload tokens only with HS256 and a key held in AWS Secrets Manager. A token cannot switch algorithm or issuer to slip through.
 - **Default deny.** A tool with no policy entry is not callable, even by a fully scoped agent.
 - **Enforce twice.** Hiding a tool from `tools/list` is a convenience; `tools/call` is authorized independently, so a client that guesses tool names gains nothing.
 - **Fail closed.** If the guardrail scan is unavailable, tool responses are withheld rather than passed through unchecked.
@@ -70,7 +76,9 @@ scripts/start.sh          # tool servers + gateway; dashboard at http://127.0.0.
 ```bash
 uv run python scripts/demo_agent.py trusted      # scripted agent, predictable for demos
 uv run python scripts/demo_agent.py intern
+uv run python scripts/demo_agent.py aws          # sign in with this machine's AWS identity
 scripts/launch_agent.sh trusted                  # Claude Code as a governed agent
+scripts/run_cloud_agent.sh                       # an agent inside AWS Lambda, no stored secret
 scripts/reset_demo.sh                            # clear state between demos
 ```
 
@@ -80,8 +88,11 @@ Any of these work against the cloud deployment by setting `LANYARD_URL` to its U
 
 ```
 lanyard/gateway.py      MCP endpoint, authorization pipeline, admin API
-lanyard/policy.py       backends, tool → scope map, approval rules
+lanyard/policy.py       backends, tool → scope map, approval rules, workload identities
+lanyard/workload.py     AWS IAM workload identity (sign, verify, issue tokens)
+lanyard/auth0_admin.py  remove and restore an agent's Auth0 grant
 lanyard/guardrails.py   Bedrock Guardrails scan of tool responses
+lanyard/agent_runner.py scripted agent used on a laptop and in the cloud
 lanyard/store.py        state store (SQLite)
 lanyard/dynamo_store.py state store (DynamoDB)
 lanyard/dashboard.html  admin dashboard
@@ -100,6 +111,8 @@ flowchart LR
     G -- "lambda:InvokeFunction" --> D["lanyard-deploy<br/>(Lambda)"]
     G <--> T[("DynamoDB<br/>revocations, approvals, audit")]
     G -- "ApplyGuardrail" --> B["Amazon Bedrock<br/>Guardrails"]
+    G -- "GetSecretValue" --> SM["Secrets Manager"]
+    W["lanyard-worker<br/>(Lambda agent, IAM role)"] -- "signed GetCallerIdentity" --> U
 ```
 
 | Service | Role in Lanyard |
@@ -108,9 +121,11 @@ flowchart LR
 | **Lambda function URL** | The gateway's public HTTPS endpoint. Agents authenticate with their JWT; the dashboard and admin API require a password. |
 | **Amazon DynamoDB** | Shared state: revocations, admin tool blocks, pending approvals, and the audit log. Strongly consistent reads make revocation immediate across instances. |
 | **Amazon Bedrock Guardrails** | Scans every tool response for prompt injection and masks emails and phone numbers. |
-| **AWS IAM** | The gateway's role can only read and write its table, invoke the two tool functions, and apply the guardrail. The tool functions have no public URL, so tools cannot be reached without going through Lanyard. |
+| **AWS IAM** | The gateway's role can only read and write its table, read its secret, invoke the two tool functions, and apply the guardrail. The tool functions have no public URL, so tools cannot be reached without going through Lanyard. The worker agent's role has no permissions at all: its identity is all it needs. |
+| **AWS STS** | Verifies workload identity: Lanyard forwards the agent's signed `GetCallerIdentity` request, and AWS confirms which role signed it. |
+| **AWS Secrets Manager** | Holds the gateway's secrets: the workload token signing key, the admin password, and the optional Auth0 management credential. |
 
-No Auth0 client secrets are deployed: the gateway only verifies tokens, using Auth0's public keys.
+Agents' Auth0 client secrets are never deployed; the gateway verifies their tokens with Auth0's public keys.
 
 **Deploy:** `scripts/build_lambda.sh && uv run python scripts/deploy_aws.py`. This creates or updates the roles and functions, prints the dashboard URL, and saves the URL and a generated admin password to `.env`. It expects a DynamoDB table named `lanyard` with string keys `pk` (partition) and `sk` (sort).
 
@@ -118,6 +133,5 @@ Amazon Bedrock AgentCore Gateway and AgentCore Identity offer a managed version 
 
 ## Roadmap
 
-- Revoking the agent's grant in Auth0 as well, so no new tokens are issued
 - Delegated access: an agent acting for a signed-in user gets the intersection of both sets of permissions (OAuth token exchange)
 - Rate limits and automatic revocation when an agent's denial rate spikes
