@@ -19,6 +19,13 @@ STEPS = [
     ("deploy_service", {"service": "payments-api", "version": "2.4.1", "environment": "production"}),
 ]
 
+# The revocation demo: only safe reads (no poisoned files, nothing that needs approval),
+# long enough to give the presenter ~25 seconds to click Revoke.
+REVOKE_DEMO_STEPS = [("list_files", {"prefix": "reports/"})] + \
+    [("read_file", {"path": f"reports/weekly-metrics-w{w}.md"}) for w in range(36, 45)] + \
+    [("read_file", {"path": f"invoices/INV-{n}.md"}) for n in range(1001, 1006)] + \
+    [("read_file", {"path": "release_notes.md"})]
+
 GREEN, RED, DIM, BOLD, RESET = "\033[32m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"
 
 
@@ -32,7 +39,7 @@ def aws_workload_token(gateway: str, audience: str, session=None) -> str:
     return r.json()["access_token"]
 
 
-def run(gateway: str, token: str, label: str, delay: float = 3.0, color: bool = True) -> str:
+def run(gateway: str, token: str, label: str, delay: float = 3.0, color: bool = True, steps=None) -> str:
     """Run the task. Returns 'finished' or 'revoked'."""
     g, r_, d, b, z = (GREEN, RED, DIM, BOLD, RESET) if color else ("",) * 5
     client = httpx.Client(timeout=180, headers={
@@ -54,7 +61,7 @@ def run(gateway: str, token: str, label: str, delay: float = 3.0, color: bool = 
     tools = [t["name"] for t in rpc("tools/list").json()["result"]["tools"]]
     print(f"{d}tools visible to this agent: {', '.join(tools)}{z}\n", flush=True)
 
-    for name, arguments in STEPS:
+    for name, arguments in (steps or STEPS):
         time.sleep(delay)
         call = f"{name}({', '.join(f'{k}={v!r}' for k, v in arguments.items() if k != 'content')})"
         if arguments.get("environment") == "production":

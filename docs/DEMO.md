@@ -35,11 +35,11 @@ Point at the **Overview**: the chart, the denial reasons, the activity feed.
 
 Run:
 ```bash
-uv run python scripts/demo_agent.py trusted --delay 3
+uv run python scripts/demo_agent.py trusted --task revoke --delay 1.5
 ```
-Open **Agents**. After **2 or 3 green ticks**, click **Revoke** on `trusted-agent`. (Don't wait longer: this agent reads a poisoned file a few steps in, and its later writes then wait for approval.)
+Open **Agents**. The agent makes 16 safe calls, about 25 seconds in all, so there's no rush: click **Revoke** on `trusted-agent` whenever you're ready.
 
-> "This agent signed in with Auth0 and is working. I revoke it now." (wait for the red 403) "Its very next call is blocked. Look at the reason in the log: its token is still valid for almost 24 hours. And Lanyard also removed its grant in Auth0, so it can't get a new token either. Two layers."
+> "This agent signed in with Auth0 and is working. I revoke it now." (wait for the red 403) "Its very next call is blocked, in about 10 milliseconds, because Lanyard checks revocation before anything else. Look at the reason in the log: its token is still valid for almost 24 hours. And Lanyard also removed its grant in Auth0, so it can't get a new token either. Two layers."
 
 ## 4. A real AI agent meets a prompt injection (1:15 to 2:15)
 

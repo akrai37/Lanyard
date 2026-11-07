@@ -1,10 +1,11 @@
 """Scripted agent: a predictable stand-in for an LLM agent, for demos and testing.
 
-Usage: uv run python scripts/demo_agent.py trusted|intern|aws|team [--delay SECONDS]
+Usage: uv run python scripts/demo_agent.py trusted|intern|aws|team [--delay SECONDS] [--task full|revoke]
 
   trusted, intern   sign in with Auth0 client credentials
   aws               sign in with this machine's AWS identity (workload identity, no stored secret)
   team              trusted-agent creates sub-agents; revoke trusted-agent to cut off all of them
+  --task revoke     16 safe reads (no poisoned files, no approvals): the revocation demo
 
 Set LANYARD_URL to use a gateway other than http://127.0.0.1:8000 (e.g. the cloud deployment).
 """
@@ -20,13 +21,14 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from dotenv import dotenv_values  # noqa: E402
 
-from lanyard.agent_runner import aws_workload_token, run, run_team  # noqa: E402
+from lanyard.agent_runner import REVOKE_DEMO_STEPS, aws_workload_token, run, run_team  # noqa: E402
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("agent", nargs="?", default="trusted")
     ap.add_argument("--delay", type=float, default=3.0)
+    ap.add_argument("--task", choices=["full", "revoke"], default="full")
     args = ap.parse_args()
     gateway = os.environ.get("LANYARD_URL", "http://127.0.0.1:8000").rstrip("/")
 
@@ -48,7 +50,7 @@ def main():
         from get_token import get_token
         token = get_token(args.agent)
         label = f"{args.agent}-agent"
-    run(gateway, token, label, args.delay)
+    run(gateway, token, label, args.delay, steps=REVOKE_DEMO_STEPS if args.task == "revoke" else None)
 
 
 if __name__ == "__main__":
