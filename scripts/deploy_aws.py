@@ -91,15 +91,45 @@ def public_url(name: str) -> str:
     return url.rstrip("/")
 
 
+def gateway_secret(password: str) -> str:
+    """Gateway secrets live in AWS Secrets Manager, not in Lambda environment variables."""
+    sm = session.client("secretsmanager")
+    name = "lanyard/gateway"
+    try:
+        current = json.loads(sm.get_secret_value(SecretId=name)["SecretString"])
+    except sm.exceptions.ResourceNotFoundException:
+        current = {}
+    value = {
+        "LANYARD_ADMIN_PASSWORD": password,
+        # Cloud-only key for workload tokens; kept across deploys so issued tokens stay valid.
+        "LANYARD_SIGNING_KEY": current.get("LANYARD_SIGNING_KEY") or secrets.token_urlsafe(48),
+    }
+    if ENV.get("AUTH0_ADMIN_CLIENT_ID") and ENV.get("AUTH0_ADMIN_CLIENT_SECRET"):
+        value["AUTH0_ADMIN_CLIENT_ID"] = ENV["AUTH0_ADMIN_CLIENT_ID"]
+        value["AUTH0_ADMIN_CLIENT_SECRET"] = ENV["AUTH0_ADMIN_CLIENT_SECRET"]
+    if current:
+        arn = sm.put_secret_value(SecretId=name, SecretString=json.dumps(value))["ARN"]
+    else:
+        arn = sm.create_secret(Name=name, SecretString=json.dumps(value),
+                               Description="Lanyard gateway secrets")["ARN"]
+    print(f"  secret {name}: {', '.join(sorted(value))}")
+    return arn
+
+
 def main():
     password = ENV.get("LANYARD_CLOUD_ADMIN_PASSWORD")
     if not password:
         password = secrets.token_urlsafe(12)
         set_key(str(ENV_FILE), "LANYARD_CLOUD_ADMIN_PASSWORD", password, quote_mode="never")
 
+    print("Secrets Manager")
+    secret_arn = gateway_secret(password)
+
     print("IAM roles")
     tools_role = role("lanyard-tools-role")
+    worker_role = role("lanyard-worker-role")  # no AWS permissions: its identity is all it needs
     gateway_role = role("lanyard-gateway-role", {"Version": "2012-10-17", "Statement": [
+        {"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": secret_arn},
         {"Effect": "Allow", "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem",
                                        "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan",
                                        "dynamodb:BatchWriteItem"],
@@ -120,7 +150,8 @@ def main():
         "AUTH0_DOMAIN": ENV["AUTH0_DOMAIN"], "AUTH0_AUDIENCE": ENV["AUTH0_AUDIENCE"],
         "LANYARD_STORE": "dynamo", "LANYARD_TABLE": TABLE,
         "LANYARD_BACKENDS": json.dumps({"files": "lambda:lanyard-files", "deploy": "lambda:lanyard-deploy"}),
-        "LANYARD_ADMIN_PASSWORD": password,
+        "LANYARD_SECRET_ID": "lanyard/gateway",
+        "LANYARD_AWS_ACCOUNT": ACCOUNT,
     }
     for k, v in ENV.items():  # client IDs only (for display names), never secrets
         if k.endswith("_CLIENT_ID") and v:
@@ -131,9 +162,14 @@ def main():
     function("lanyard-gateway", gateway_role, "lanyard.lambda_handler.handler", env, timeout=180, memory=1024)
     url = public_url("lanyard-gateway")
 
+    print("Cloud agent (workload identity)")
+    function("lanyard-worker", worker_role, "lanyard.worker_handler.handler",
+             {"LANYARD_URL": url, "LANYARD_AUDIENCE": ENV["AUTH0_AUDIENCE"]}, timeout=300)
+
     set_key(str(ENV_FILE), "LANYARD_CLOUD_URL", url, quote_mode="never")
     print(f"\nDashboard: {url}/   (user: admin, password: LANYARD_CLOUD_ADMIN_PASSWORD in .env)")
     print(f"Agents:    LANYARD_URL={url} uv run python scripts/demo_agent.py trusted")
+    print("Cloud agent: scripts/run_cloud_agent.sh")
 
 
 if __name__ == "__main__":
