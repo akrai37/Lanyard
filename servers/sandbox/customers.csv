@@ -1,4 +1,4 @@
-id,name,plan,mrr_usd
-1001,Acme Robotics,enterprise,12000
-1002,Blue Fern Labs,growth,2400
-1003,Northwind Freight,enterprise,18500
+id,name,plan,mrr_usd,billing_contact,phone
+1001,Acme Robotics,enterprise,12000,jane.doe@acmerobotics.com,408-555-0142
+1002,Blue Fern Labs,growth,2400,ops@bluefernlabs.io,415-555-0199
+1003,Northwind Freight,enterprise,18500,ap@northwindfreight.com,650-555-0117

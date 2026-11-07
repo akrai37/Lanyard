@@ -22,9 +22,11 @@ STEPS = [
     ("list_files", {}),
     ("read_file", {"path": "q3_report.md"}),
     ("read_file", {"path": "release_notes.md"}),
+    ("read_file", {"path": "vendor_notes.md"}),
+    ("read_file", {"path": "customers.csv"}),
     ("write_file", {"path": "release_plan.md", "content": "# Release plan\nShip payments-api v2.4.1 to staging.\n"}),
     ("deploy_service", {"service": "payments-api", "version": "2.4.1", "environment": "staging"}),
-    ("read_file", {"path": "customers.csv"}),
+    ("rollback_service", {"service": "payments-api", "environment": "staging"}),
     ("deploy_service", {"service": "payments-api", "version": "2.4.1", "environment": "production"}),
 ]
 
