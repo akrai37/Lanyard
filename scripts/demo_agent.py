@@ -1,9 +1,10 @@
 """Scripted agent: a predictable stand-in for an LLM agent, for demos and testing.
 
-Usage: uv run python scripts/demo_agent.py trusted|intern|aws [--delay SECONDS]
+Usage: uv run python scripts/demo_agent.py trusted|intern|aws|team [--delay SECONDS]
 
   trusted, intern   sign in with Auth0 client credentials
   aws               sign in with this machine's AWS identity (workload identity, no stored secret)
+  team              trusted-agent creates sub-agents; revoke trusted-agent to cut off all of them
 
 Set LANYARD_URL to use a gateway other than http://127.0.0.1:8000 (e.g. the cloud deployment).
 """
@@ -19,7 +20,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from dotenv import dotenv_values  # noqa: E402
 
-from lanyard.agent_runner import aws_workload_token, run  # noqa: E402
+from lanyard.agent_runner import aws_workload_token, run, run_team  # noqa: E402
 
 
 def main():
@@ -39,6 +40,10 @@ def main():
             print(f"\033[31m✗ {e}\033[0m")
             return
         label = "aws workload agent"
+    elif args.agent == "team":
+        from get_token import get_token
+        run_team(gateway, get_token("trusted"), "trusted-agent", args.delay)
+        return
     else:
         from get_token import get_token
         token = get_token(args.agent)

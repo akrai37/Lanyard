@@ -37,3 +37,10 @@ WORKLOAD_IDENTITIES = {
 def needs_approval(tool: str, arguments: dict) -> bool:
     rule = APPROVAL_RULES.get(tool)
     return rule is not None and all(arguments.get(k) == v for k, v in rule.items())
+
+# Tools needing these scopes are "risky": once an agent is tainted (it has read a prompt
+# injection), any risky call needs human approval until an admin clears the taint.
+RISKY_SCOPES = {"files:write", "deploy:run"}
+
+# Sub-agents: how many levels deep an agent may delegate (root agent counts as 1).
+MAX_DELEGATION_DEPTH = 3

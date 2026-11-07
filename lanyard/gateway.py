@@ -26,7 +26,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from . import workload
 from .auth0_admin import Auth0Admin
 from .guardrails import ToolResponseGuard
-from .policy import APPROVAL_TIMEOUT_SECONDS, BACKENDS, TOOL_SCOPES, WORKLOAD_IDENTITIES, needs_approval
+from .policy import (APPROVAL_TIMEOUT_SECONDS, BACKENDS, MAX_DELEGATION_DEPTH, RISKY_SCOPES, TOOL_SCOPES,
+                     WORKLOAD_IDENTITIES, needs_approval)
 from .store import SQLiteStore
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,6 +73,15 @@ AWS_ACCOUNT = ENV.get("LANYARD_AWS_ACCOUNT")
 # Optional: also remove a revoked agent's grant in Auth0, so it cannot get new tokens.
 auth0_admin = (Auth0Admin(DOMAIN, ENV["AUTH0_ADMIN_CLIENT_ID"], ENV["AUTH0_ADMIN_CLIENT_SECRET"], AUDIENCE, http)
                if ENV.get("AUTH0_ADMIN_CLIENT_ID") and ENV.get("AUTH0_ADMIN_CLIENT_SECRET") else None)
+
+
+def lineage_revocation(lineage: list[str]) -> tuple[str | None, dict | None]:
+    """The nearest revoked agent in this agent's lineage (itself first, then its ancestors)."""
+    for a in reversed(lineage):
+        rev = store.revocation(a)
+        if rev:
+            return a, rev
+    return None, None
 
 
 def agent_name(agent_id: str) -> str:
@@ -212,7 +222,9 @@ async def mcp_endpoint(request: Request):
     agent_id = claims.get("azp") or claims["sub"]
     name = claims.get("lanyard_name") or AGENT_NAMES.get(agent_id, agent_id[:10])
     scopes = set(claims.get("scope", "").split())
-    store.seen_agent(agent_id, name, sorted(scopes), claims.get("lanyard_identity", "auth0"))
+    chain = claims.get("lanyard_chain") or []  # ancestors, for sub-agents
+    store.seen_agent(agent_id, name, sorted(scopes), claims.get("lanyard_identity", "auth0"),
+                     parent=chain[-1] if chain else None)
 
     def log(decision, reason, **detail):
         store.log(agent_id=agent_id, agent_name=name, method=method, tool=tool, decision=decision,
@@ -222,11 +234,15 @@ async def mcp_endpoint(request: Request):
     if rid is None:
         return Response(status_code=202)
 
-    # 2. revocation: checked on every request, even though the token is still valid
-    rev = store.revocation(agent_id)
+    # 2. revocation: checked on every request, even though the token is still valid.
+    #    A sub-agent is also cut off when any agent above it in the chain is revoked.
+    rev_id, rev = lineage_revocation(chain + [agent_id])
     if rev:
         secs_left = int(claims["exp"] - time.time())
-        log("deny", f"agent revoked ({rev['reason']}); token still valid for {secs_left}s")
+        if rev_id == agent_id:
+            log("deny", f"agent revoked ({rev['reason']}); token still valid for {secs_left}s")
+        else:
+            log("deny", f"parent agent {agent_name(rev_id)} revoked, cascade; token still valid for {secs_left}s")
         return rpc_error(rid, -32003, f"Lanyard: access revoked for {name}", status=403)
 
     if method == "initialize":
@@ -258,12 +274,16 @@ async def mcp_endpoint(request: Request):
             log("deny", reason, arguments=params.get("arguments"))
             return rpc_result(rid, denied_tool_result(f"Lanyard denied this call: {reason}."))
 
-        # high-risk call: hold it until a human approves or denies on the dashboard
+        # high-risk call: hold it until a human approves or denies on the dashboard.
+        # A tainted agent (it has read a prompt injection) needs approval for any risky tool.
         arguments = params.get("arguments") or {}
-        if needs_approval(tool, arguments):
+        taint = next((t for t in (store.taint_of(a) for a in chain + [agent_id]) if t), None)
+        tainted_risk = taint is not None and TOOL_SCOPES.get(tool) in RISKY_SCOPES
+        if needs_approval(tool, arguments) or tainted_risk:
             approval_id = store.request_approval(agent_id, name, tool, arguments)
-            log("pending", "high-risk call: waiting for human approval",
-                arguments=arguments, approval_id=approval_id)
+            why = ("tainted agent (read a prompt injection): risky call needs human approval" if tainted_risk
+                   and not needs_approval(tool, arguments) else "high-risk call: waiting for human approval")
+            log("pending", why, arguments=arguments, approval_id=approval_id)
             deadline = time.monotonic() + APPROVAL_TIMEOUT_SECONDS
             status = "pending"
             while status == "pending" and time.monotonic() < deadline:
@@ -309,7 +329,9 @@ async def mcp_endpoint(request: Request):
                     return rpc_result(rid, denied_tool_result(
                         "Lanyard withheld this tool response: the safety scan is unavailable."))
                 if scan["verdict"] == "block":
-                    log("deny", "prompt injection in tool response (Bedrock Guardrails)",
+                    source = (params.get("arguments") or {}).get("path") or tool
+                    store.taint(agent_id, f"read a prompt injection in {source}")
+                    log("deny", "prompt injection in tool response (Bedrock Guardrails); agent marked tainted",
                         arguments=params.get("arguments"), findings=scan["findings"],
                         excerpt=item["text"][:300])
                     return rpc_result(rid, denied_tool_result(
@@ -361,6 +383,65 @@ async def auth_aws(request: Request):
     return {"access_token": token, "token_type": "Bearer", "expires_in": ttl}
 
 
+@app.post("/auth/delegate")
+async def auth_delegate(request: Request):
+    """Sub-agents: an agent creates a helper with a subset of its own permissions.
+    The helper's token records its full chain of parents, so revoking any of them cuts it off too."""
+    t0 = time.perf_counter()
+    if not SIGNING_KEY:
+        return JSONResponse({"error": "delegation is not enabled"}, status_code=404)
+    auth = request.headers.get("authorization", "")
+    try:
+        parent = await verify_token(auth[7:].strip()) if auth.lower().startswith("bearer ") else None
+    except Exception as e:
+        parent = None
+    if not parent:
+        return JSONResponse({"error": "a valid parent agent token is required"}, status_code=401)
+
+    parent_id = parent.get("azp") or parent["sub"]
+    parent_name = parent.get("lanyard_name") or AGENT_NAMES.get(parent_id, parent_id[:10])
+    parent_chain = parent.get("lanyard_chain") or []
+    store.seen_agent(parent_id, parent_name, sorted(parent.get("scope", "").split()),
+                     parent.get("lanyard_identity", "auth0"), parent=parent_chain[-1] if parent_chain else None)
+    chain = parent_chain + [parent_id]
+    body = await request.json()
+    child = str(body.get("name", "")).strip()
+    wanted = set(body.get("scopes") or [])
+
+    def log(decision, reason, agent_id=parent_id, name=parent_name, **detail):
+        store.log(agent_id=agent_id, agent_name=name, method="auth/delegate", tool=None, decision=decision,
+                  reason=reason, latency_ms=int((time.perf_counter() - t0) * 1000), detail=detail)
+
+    if not child or not all(c.isalnum() or c in "-_" for c in child) or len(child) > 40:
+        return JSONResponse({"error": "name must be 1-40 letters, digits, '-' or '_'"}, status_code=400)
+    rev_id, _ = lineage_revocation(chain)
+    if rev_id:
+        log("deny", f"cannot create sub-agent '{child}': {agent_name(rev_id)} is revoked")
+        return JSONResponse({"error": "parent agent is revoked"}, status_code=403)
+    if len(chain) >= MAX_DELEGATION_DEPTH:
+        log("deny", f"cannot create sub-agent '{child}': delegation deeper than {MAX_DELEGATION_DEPTH}")
+        return JSONResponse({"error": "delegation chain too deep"}, status_code=403)
+    extra = wanted - set(parent.get("scope", "").split())
+    if extra:
+        log("deny", f"privilege escalation blocked: sub-agent '{child}' asked for {', '.join(sorted(extra))}, "
+                    f"which {parent_name} does not have", requested=sorted(wanted))
+        return JSONResponse({"error": f"a sub-agent cannot have more access than its parent: {sorted(extra)}"},
+                            status_code=403)
+
+    now = int(time.time())
+    child_id = f"{child}@{parent_id}"
+    child_name = f"{parent_name} › {child}"
+    exp = min(int(parent["exp"]), now + int(body.get("ttl_seconds") or 900))
+    token = jwt.encode({"iss": workload.LANYARD_ISSUER, "aud": AUDIENCE, "sub": child_id, "azp": child_id,
+                        "scope": " ".join(sorted(wanted)), "iat": now, "exp": exp,
+                        "lanyard_identity": "delegated", "lanyard_name": child_name, "lanyard_chain": chain},
+                       SIGNING_KEY, algorithm="HS256")
+    store.seen_agent(child_id, child_name, sorted(wanted), "delegated", parent=parent_id)
+    log("allow", f"created sub-agent '{child}' with {', '.join(sorted(wanted)) or 'no'} permissions",
+        child_id, child_name, parent=parent_id, chain=chain)
+    return {"access_token": token, "token_type": "Bearer", "expires_in": exp - now, "agent_id": child_id}
+
+
 @app.get("/mcp")
 async def mcp_get():
     # We do not offer a server-initiated SSE stream; the spec allows 405 here.
@@ -389,7 +470,17 @@ async def state(after: int = 0):
             else:
                 status = "allowed"
             tools.append({"name": t, "scope": scope, "status": status})
-        agents.append(a | {"revoked": store.revocation(a["agent_id"]), "tools": tools})
+        own = store.revocation(a["agent_id"])
+        cascade = None
+        parent = a.get("parent")
+        seen = set()
+        while parent and not cascade and parent not in seen:  # walk up to find a revoked ancestor
+            seen.add(parent)
+            if store.revocation(parent):
+                cascade = agent_name(parent)
+            parent = next((x.get("parent") for x in store.agents() if x["agent_id"] == parent), None)
+        agents.append(a | {"revoked": own, "revoked_by_parent": cascade,
+                           "taint": store.taint_of(a["agent_id"]), "tools": tools})
     return {"agents": agents, "approvals": store.pending_approvals(), "events": store.events(after, 1000 if after == 0 else 200)}
 
 
@@ -426,6 +517,8 @@ async def policy():
         "store": "DynamoDB" if ENV.get("LANYARD_STORE") == "dynamo" else "SQLite",
         "environment": "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local",
         "approval_timeout": APPROVAL_TIMEOUT_SECONDS,
+        "risky_scopes": sorted(RISKY_SCOPES),
+        "max_delegation_depth": MAX_DELEGATION_DEPTH,
         "workload_token_minutes": workload.TOKEN_TTL_SECONDS // 60,
     }
 
@@ -476,6 +569,14 @@ async def restore(agent_id: str):
     store.restore(agent_id)
     store.log(agent_id=agent_id, agent_name=agent_name(agent_id), method="admin", tool=None,
               decision="admin", reason=reason)
+    return {"ok": True}
+
+
+@app.post("/api/agents/{agent_id}/untaint")
+async def untaint(agent_id: str):
+    store.clear_taint(agent_id)
+    store.log(agent_id=agent_id, agent_name=agent_name(agent_id), method="admin", tool=None,
+              decision="admin", reason="taint cleared by admin")
     return {"ok": True}
 
 

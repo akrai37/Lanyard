@@ -264,6 +264,7 @@ const S = { agents: [], approvals: [], events: [], policy: null, lastId: 0, load
 const expanded = new Set();
 const ICON = {
   auth0: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>',
+  sub: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5V13a5 5 0 0 0 5 5h4.5"/></svg>',
   aws: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z"/></svg>',
 };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -272,12 +273,13 @@ const ago = ts => { const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); r
 const agoSpan = ts => `<span class="ago" data-ts="${ts}">${ago(ts)}</span>`;
 const DECISION_LABEL = { allow: "Allowed", deny: "Denied", pending: "Pending", admin: "Admin", error: "Error" };
 const pill = d => `<span class="pill ${esc(d)}">${esc(DECISION_LABEL[d] || d)}</span>`;
-const isCall = e => e.method === "tools/call" || e.method === "auth/aws" || e.method === "tools/list" || e.method === "initialize";
+const isCall = e => e.method === "tools/call" || e.method === "auth/aws" || e.method === "auth/delegate" || e.method === "tools/list" || e.method === "initialize";
 
 function action(e) {
   if (e.method === "tools/call") return e.tool;
   if (e.method === "admin") return e.tool ? `admin · ${e.tool}` : "admin";
   if (e.method === "auth/aws") return "sign-in (AWS IAM)";
+  if (e.method === "auth/delegate") return "create sub-agent";
   if (e.method === "initialize") return "session start";
   return e.method;
 }
@@ -285,6 +287,8 @@ function action(e) {
 function denyCategory(reason) {
   const r = (reason || "").toLowerCase();
   if (r.includes("requires scope")) return "Missing permission";
+  if (r.includes("cascade")) return "Parent agent revoked";
+  if (r.includes("privilege escalation")) return "Privilege escalation blocked";
   if (r.includes("revoked")) return "Agent revoked";
   if (r.includes("prompt injection")) return "Prompt injection blocked";
   if (r.includes("blocked by admin")) return "Tool blocked by admin";
@@ -314,6 +318,7 @@ async function act(path, msg) {
 const nameOf = id => (S.agents.find(a => a.agent_id === id) || {}).name || id;
 window.revokeAgent = id => act(`/api/agents/${encodeURIComponent(id)}/revoke`, `Revoked ${nameOf(id)}. Its next call will be blocked.`);
 window.restoreAgent = id => act(`/api/agents/${encodeURIComponent(id)}/restore`, `Restored access for ${nameOf(id)}.`);
+window.untaint = id => act(`/api/agents/${encodeURIComponent(id)}/untaint`, `Cleared the taint on ${nameOf(id)}.`);
 window.toggleTool = (id, tool) => act(`/api/agents/${encodeURIComponent(id)}/tools/${encodeURIComponent(tool)}/toggle`, `Updated ${tool} for ${nameOf(id)}.`);
 window.decide = (id, d) => act(`/api/approvals/${id}/${d}`, d === "approve" ? "Approved. The call is running." : "Denied. The agent was told no.");
 
@@ -429,9 +434,19 @@ function approvalCard(a) {
   </div>`;
 }
 function identityBadge(a) {
+  if (a.identity === "delegated") return `<span class="badge">${ICON.sub}Sub-agent of ${esc(nameOf(a.parent))} · scoped token</span>`;
   return a.identity === "aws-iam"
     ? `<span class="badge">${ICON.aws}AWS IAM role · no stored secret</span>`
     : `<span class="badge">${ICON.auth0}Auth0 · machine-to-machine</span>`;
+}
+function avatarIcon(a) { return a.identity === "aws-iam" ? ICON.aws : a.identity === "delegated" ? ICON.sub : ICON.auth0; }
+function agentTree(agents) {
+  // parents first, each followed by its sub-agents
+  const kids = {}, byId = new Set(agents.map(a => a.agent_id)), out = [];
+  agents.forEach(a => { const p = a.parent && byId.has(a.parent) ? a.parent : ""; (kids[p] = kids[p] || []).push(a); });
+  const walk = (p, depth) => (kids[p] || []).forEach(a => { out.push([a, depth]); walk(a.agent_id, depth + 1); });
+  walk("", 0);
+  return out;
 }
 function setHTML(el, html) { if (el && el._html !== html) { el.innerHTML = html; el._html = html; } }
 
@@ -462,7 +477,9 @@ const VIEWS = {
       document.getElementById("t-pend").textContent = S.approvals.length;
       const rev = S.agents.filter(a => a.revoked).length;
       document.getElementById("t-agents").textContent = S.agents.length;
-      document.getElementById("t-agents-n").textContent = S.agents.length ? (rev ? `${rev} revoked` : "all active") : "none seen yet";
+      const tainted = S.agents.filter(a => a.taint).length;
+      document.getElementById("t-agents-n").textContent = S.agents.length
+        ? [rev ? `${rev} revoked` : "", tainted ? `${tainted} tainted` : ""].filter(Boolean).join(" · ") || "all active" : "none seen yet";
       drawDecisions(document.getElementById("c-dec"));
       drawReasons(document.getElementById("c-why"));
       setHTML(document.getElementById("o-feed"), feedHTML(S.events.filter(e => e.method !== "tools/list").slice(-8).reverse()));
@@ -475,24 +492,25 @@ const VIEWS = {
     desc: "Each agent has its own identity. Revoke one and its very next call is blocked, even if its token has not expired.",
     mount: v => v.innerHTML = `<div id="a-list" style="display:grid;gap:18px"></div>`,
     update() {
-      const html = S.agents.length ? S.agents.map(a => {
+      const html = S.agents.length ? agentTree(S.agents).map(([a, depth]) => {
         const mine = S.events.filter(e => e.agent_id === a.agent_id);
         const allowed = mine.filter(e => e.decision === "allow" && isCall(e)).length, denied = mine.filter(e => e.decision === "deny").length;
         const id = esc(JSON.stringify(a.agent_id));
-        const rev = a.revoked;
+        const rev = a.revoked, cut = !rev && a.revoked_by_parent, taint = a.taint;
         const chips = a.tools.map(t => {
           const sub = t.status === "no-scope" ? `needs ${t.scope}` : t.status === "blocked" ? "blocked by you" : `via ${t.scope}`;
           const click = t.status === "no-scope" ? "disabled" : `onclick='toggleTool(${id}, ${esc(JSON.stringify(t.name))})'`;
           return `<button class="chip ${t.status}" ${click} title="${t.status === "no-scope" ? "Not in this agent's token" : "Click to " + (t.status === "blocked" ? "allow" : "block")}"><span class="dot"></span><span><span class="tn">${esc(t.name)}</span><span class="ts">${esc(sub)}</span></span></button>`;
         }).join("");
-        return `<article class="panel agent ${rev ? "revoked" : ""}">
+        const status = rev ? `<span class="pill deny">Revoked</span><button class="btn" onclick='restoreAgent(${id})'>Restore access</button>`
+          : cut ? `<span class="pill deny">Cut off</span><span class="muted" style="font-size:12.5px">${esc(cut)} was revoked</span>`
+          : `<span class="pill allow">Active</span><button class="btn danger" onclick='revokeAgent(${id})'>Revoke</button>`;
+        const taintBtn = taint ? `<span class="pill pending" title="${esc(taint.reason)}">Tainted</span><button class="btn" onclick='untaint(${id})'>Clear taint</button>` : "";
+        return `<article class="panel agent ${rev || cut ? "revoked" : ""}" style="margin-left:${Math.min(depth, 3) * 28}px">
           <div class="agent-h">
-            <div class="avatar">${a.identity === "aws-iam" ? ICON.aws : ICON.auth0}</div>
+            <div class="avatar">${avatarIcon(a)}</div>
             <div class="who"><span class="name">${esc(a.name)}</span>${identityBadge(a)}</div>
-            <div class="actions">
-              ${rev ? `<span class="pill deny">Revoked</span><button class="btn" onclick='restoreAgent(${id})'>Restore access</button>`
-                    : `<span class="pill allow">Active</span><button class="btn danger" onclick='revokeAgent(${id})'>Revoke</button>`}
-            </div>
+            <div class="actions">${taintBtn}${status}</div>
           </div>
           <div class="agent-b">
             <div>
@@ -503,6 +521,7 @@ const VIEWS = {
                 <dt>Last seen</dt><dd>${agoSpan(a.last_seen)}</dd>
                 <dt>Calls</dt><dd>${allowed} allowed · ${denied} denied</dd>
                 ${rev ? `<dt>Revoked</dt><dd>${agoSpan(rev.revoked_at)}${rev.grant_scopes ? " · Auth0 grant removed" : ""}</dd>` : ""}
+                ${taint ? `<dt>Tainted</dt><dd>${esc(taint.reason)} · risky tools need approval</dd>` : ""}
               </dl>
             </div>
             <div>
@@ -596,6 +615,8 @@ const VIEWS = {
             ${check(p.auth0_cutoff, "Cut off at Auth0 on revoke", p.auth0_cutoff ? "Revoking also removes the agent's Auth0 grant" : "Not configured: revocation applies at the gateway only")}
             ${check(p.guardrail, "Bedrock Guardrails on tool responses", p.guardrail ? `Blocks prompt injection, masks emails and phones; fails ${esc(p.guardrail_fail)}` : "Not configured")}
             ${check(true, "Human approval for high-risk calls", `Undecided requests expire after ${p.approval_timeout}s`)}
+            ${check(p.guardrail, "Taint after prompt injection", `An agent that read an injection needs approval for ${(p.risky_scopes || []).join(", ")} until an admin clears it`)}
+            ${check(true, "Sub-agents can't exceed their parent", `Up to ${p.max_delegation_depth} levels; revoking a parent cuts off every sub-agent below it`)}
           </div></div>
         </div>
         <div class="panel"><div class="panel-h"><h3>Tool permissions</h3><span class="sub">which permission each tool needs</span></div>

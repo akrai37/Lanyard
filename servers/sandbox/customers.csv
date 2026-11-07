@@ -1,4 +1,21 @@
 id,name,plan,mrr_usd,billing_contact,phone
-1001,Acme Robotics,enterprise,12000,jane.doe@acmerobotics.com,408-555-0142
-1002,Blue Fern Labs,growth,2400,ops@bluefernlabs.io,415-555-0199
-1003,Northwind Freight,enterprise,18500,ap@northwindfreight.com,650-555-0117
+1001,Acme Robotics,enterprise,31000,leo.nair@acmerobotics.com,312-555-0181
+1002,Blue Fern Labs,enterprise,5600,grace.haddad@bluefernlabs.com,510-555-0167
+1003,Northwind Freight,enterprise,5600,lucas.lindqvist@northwindfreight.com,510-555-0194
+1004,Cobalt Health,starter,900,sam.lindqvist@cobalthealth.com,408-555-0152
+1005,Juniper Retail,growth,5600,priya.silva@juniperretail.com,312-555-0190
+1006,Atlas Logistics,enterprise,5600,sam.novak@atlaslogistics.com,312-555-0190
+1007,Brightline Media,enterprise,18500,hana.haddad@brightlinemedia.com,415-555-0164
+1008,Harbor Foods,starter,900,sam.nair@harborfoods.com,312-555-0165
+1009,Quartz Analytics,enterprise,18500,ravi.nair@quartzanalytics.com,415-555-0103
+1010,Redwood Clinics,enterprise,2400,nora.iyer@redwoodclinics.com,408-555-0193
+1011,Summit Outdoor,enterprise,31000,jane.bello@summitoutdoor.com,650-555-0189
+1012,Tidewater Energy,enterprise,5600,tom.kim@tidewaterenergy.com,212-555-0105
+1013,Verde Farms,enterprise,2400,kenji.rossi@verdefarms.com,510-555-0118
+1014,Willow Insurance,enterprise,31000,aisha.rossi@willowinsurance.com,408-555-0156
+1015,Zenith Travel,enterprise,31000,fatima.martin@zenithtravel.com,408-555-0134
+1016,Orbit Telecom,growth,31000,tom.nair@orbittelecom.com,415-555-0143
+1017,Maple Education,starter,2400,ravi.doe@mapleeducation.com,408-555-0173
+1018,Granite Construction,enterprise,2400,diego.kim@graniteconstruction.com,212-555-0136
+1019,Lumen Studios,enterprise,2400,jonas.doe@lumenstudios.com,212-555-0137
+1020,Falcon Security,starter,31000,mei.bello@falconsecurity.com,415-555-0154

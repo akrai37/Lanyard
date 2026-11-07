@@ -74,3 +74,62 @@ def run(gateway: str, token: str, label: str, delay: float = 3.0, color: bool = 
 
     print(f"\n{b}Task finished.{z}", flush=True)
     return "finished"
+
+
+# ---------- sub-agents ----------
+
+def delegate(gateway: str, parent_token: str, name: str, scopes: list[str], ttl_seconds: int = 900) -> str:
+    """Ask Lanyard to create a sub-agent with a subset of the parent's permissions."""
+    r = httpx.post(f"{gateway}/auth/delegate", timeout=30, headers={"authorization": f"Bearer {parent_token}"},
+                   json={"name": name, "scopes": scopes, "ttl_seconds": ttl_seconds})
+    if r.status_code != 200:
+        raise RuntimeError(r.json().get("error", r.text))
+    return r.json()["access_token"]
+
+
+def call_tool(gateway: str, token: str, tool: str, arguments: dict) -> tuple[int, str]:
+    """One tool call. Returns (HTTP status, first line of the result or error)."""
+    r = httpx.post(f"{gateway}/mcp", timeout=180, headers={"authorization": f"Bearer {token}",
+                                                           "accept": "application/json, text/event-stream"},
+                   json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                         "params": {"name": tool, "arguments": arguments}})
+    body = r.json()
+    if "error" in body:
+        return r.status_code, body["error"]["message"]
+    res = body.get("result", {})
+    text = ((res.get("content") or [{}])[0].get("text") or "").strip().splitlines()
+    return (r.status_code if not res.get("isError") else 409), (text[0] if text else "")
+
+
+def run_team(gateway: str, root_token: str, root_label: str, delay: float = 3.0, rounds: int = 12) -> None:
+    """Root agent creates a sub-agent, which creates its own sub-agent; both work until cut off."""
+    print(f"{BOLD}{root_label}{RESET} is building a team of sub-agents\n", flush=True)
+    try:
+        delegate(gateway, root_token, "rogue-helper", ["deploy:run", "admin:all"])
+        print(f"{RED}✗ rogue-helper was created (this should not happen){RESET}", flush=True)
+    except RuntimeError as e:
+        print(f"{RED}✗ rogue-helper refused:{RESET} {e}", flush=True)
+
+    writer = delegate(gateway, root_token, "changelog-writer", ["files:read", "files:write"])
+    print(f"{GREEN}✓ created changelog-writer{RESET} {DIM}(files:read, files:write){RESET}", flush=True)
+    reader = delegate(gateway, writer, "proofreader", ["files:read"])
+    print(f"{GREEN}✓ changelog-writer created proofreader{RESET} {DIM}(files:read){RESET}\n", flush=True)
+
+    team = [("changelog-writer", writer, "read_file", {"path": "release_notes.md"}),
+            ("proofreader", reader, "read_file", {"path": "q3_report.md"})]
+    alive = {n for n, *_ in team}
+    for _ in range(rounds):
+        time.sleep(delay)
+        for name, token, tool, args in team:
+            if name not in alive:
+                continue
+            status, text = call_tool(gateway, token, tool, args)
+            if status == 403:
+                print(f"{RED}✗ {name}: {text}{RESET}", flush=True)
+                alive.discard(name)
+            else:
+                print(f"{GREEN}✓ {name}{RESET} {tool}({args.get('path')})  {DIM}{text[:60]}{RESET}", flush=True)
+        if not alive:
+            print(f"\n{RED}{BOLD}Whole team stopped: revoking the parent cut off every sub-agent.{RESET}", flush=True)
+            return
+    print(f"\n{BOLD}Team finished.{RESET}", flush=True)

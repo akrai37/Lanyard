@@ -2,7 +2,8 @@
 
 Single table, partition key `pk`, sort key `sk`:
   agent / <agent_id>          name, scopes, last_seen
-  revoked / <agent_id>        revoked_at, reason
+  revoked / <agent_id>        revoked_at, reason, grant_scopes
+  taint / <agent_id>          tainted_at, reason
   block#<agent_id> / <tool>   admin tool block
   approval / <padded id>      tool, arguments, status
   audit / <padded id>         audit event
@@ -65,9 +66,13 @@ class DynamoStore:
         return Decimal(str(round(time.time(), 3)))
 
     # agents
-    def seen_agent(self, agent_id: str, name: str, scopes: list[str], identity: str = "auth0") -> None:
-        self._t.put_item(Item={"pk": "agent", "sk": agent_id, "agent_id": agent_id, "name": name,
-                               "scopes": " ".join(scopes), "last_seen": self._now(), "identity": identity})
+    def seen_agent(self, agent_id: str, name: str, scopes: list[str], identity: str = "auth0",
+                   parent: str | None = None) -> None:
+        item = {"pk": "agent", "sk": agent_id, "agent_id": agent_id, "name": name,
+                "scopes": " ".join(scopes), "last_seen": self._now(), "identity": identity}
+        if parent:
+            item["parent"] = parent
+        self._t.put_item(Item=item)
 
     def agents(self) -> list[dict]:
         return sorted(({k: v for k, v in a.items() if k not in ("pk", "sk")} for a in self._query("agent")),
@@ -93,6 +98,18 @@ class DynamoStore:
         r = {k: v for k, v in r.items() if k not in ("pk", "sk")}
         r["grant_scopes"] = json.loads(r["grant_scopes"]) if r.get("grant_scopes") else None
         return r
+
+    # taint: the agent has read content flagged as prompt injection
+    def taint(self, agent_id: str, reason: str) -> None:
+        self._t.put_item(Item={"pk": "taint", "sk": agent_id, "agent_id": agent_id,
+                               "tainted_at": self._now(), "reason": reason})
+
+    def clear_taint(self, agent_id: str) -> None:
+        self._t.delete_item(Key={"pk": "taint", "sk": agent_id})
+
+    def taint_of(self, agent_id: str) -> dict | None:
+        r = self._get("taint", agent_id)
+        return {k: v for k, v in r.items() if k not in ("pk", "sk")} if r else None
 
     # admin tool blocks
     def toggle_tool_block(self, agent_id: str, tool: str) -> bool:

@@ -25,6 +25,8 @@ class SQLiteStore:
                     agent_id TEXT PRIMARY KEY, name TEXT, scopes TEXT, last_seen REAL, identity TEXT);
                 CREATE TABLE IF NOT EXISTS revocations (
                     agent_id TEXT PRIMARY KEY, revoked_at REAL, reason TEXT, grant_scopes TEXT);
+                CREATE TABLE IF NOT EXISTS taints (
+                    agent_id TEXT PRIMARY KEY, tainted_at REAL, reason TEXT);
                 CREATE TABLE IF NOT EXISTS tool_blocks (
                     agent_id TEXT, tool TEXT, PRIMARY KEY (agent_id, tool));
                 CREATE TABLE IF NOT EXISTS approvals (
@@ -35,7 +37,7 @@ class SQLiteStore:
                     method TEXT, tool TEXT, decision TEXT, reason TEXT, latency_ms INTEGER, detail TEXT);
                 """
             )
-            for table, column in (("agents", "identity"), ("revocations", "grant_scopes")):
+            for table, column in (("agents", "identity"), ("agents", "parent"), ("revocations", "grant_scopes")):
                 try:  # upgrade databases created before these columns existed
                     self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
                 except sqlite3.OperationalError:
@@ -46,12 +48,13 @@ class SQLiteStore:
             return self._db.execute(sql, args).fetchall()
 
     # agents
-    def seen_agent(self, agent_id: str, name: str, scopes: list[str], identity: str = "auth0") -> None:
+    def seen_agent(self, agent_id: str, name: str, scopes: list[str], identity: str = "auth0",
+                   parent: str | None = None) -> None:
         self._q(
-            "INSERT INTO agents (agent_id, name, scopes, last_seen, identity) VALUES (?,?,?,?,?) "
+            "INSERT INTO agents (agent_id, name, scopes, last_seen, identity, parent) VALUES (?,?,?,?,?,?) "
             "ON CONFLICT(agent_id) DO UPDATE SET name=excluded.name, scopes=excluded.scopes, "
-            "last_seen=excluded.last_seen, identity=excluded.identity",
-            (agent_id, name, " ".join(scopes), time.time(), identity),
+            "last_seen=excluded.last_seen, identity=excluded.identity, parent=excluded.parent",
+            (agent_id, name, " ".join(scopes), time.time(), identity, parent),
         )
 
     def agents(self) -> list[dict]:
@@ -76,6 +79,17 @@ class SQLiteStore:
         r = dict(rows[0])
         r["grant_scopes"] = json.loads(r["grant_scopes"]) if r.get("grant_scopes") else None
         return r
+
+    # taint: the agent has read content flagged as prompt injection
+    def taint(self, agent_id: str, reason: str) -> None:
+        self._q("INSERT OR REPLACE INTO taints VALUES (?,?,?)", (agent_id, time.time(), reason))
+
+    def clear_taint(self, agent_id: str) -> None:
+        self._q("DELETE FROM taints WHERE agent_id=?", (agent_id,))
+
+    def taint_of(self, agent_id: str) -> dict | None:
+        rows = self._q("SELECT * FROM taints WHERE agent_id=?", (agent_id,))
+        return dict(rows[0]) if rows else None
 
     # admin tool blocks (narrow an agent's access below its token scopes)
     def toggle_tool_block(self, agent_id: str, tool: str) -> bool:
@@ -116,7 +130,7 @@ class SQLiteStore:
     def reset(self) -> None:
         """Clear everything for a fresh demo."""
         with self._lock:
-            for table in ("agents", "revocations", "tool_blocks", "approvals", "audit"):
+            for table in ("agents", "revocations", "taints", "tool_blocks", "approvals", "audit"):
                 self._db.execute(f"DELETE FROM {table}")
 
     # audit log

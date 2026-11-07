@@ -14,11 +14,12 @@ from mcp import Client
 SERVER = os.environ.get("LANYARD_TOOL_SERVER", "files")
 
 if SERVER == "files":
-    # The deployment package is read-only; give the file share a writable copy.
-    tmp = Path("/tmp/sandbox")
-    if not tmp.exists():
-        shutil.copytree(Path(__file__).parent / "sandbox", tmp)
-    os.environ["FILES_SANDBOX"] = str(tmp)
+    if not os.environ.get("FILES_BUCKET"):
+        # No S3 bucket configured: the package is read-only, so use a writable local copy.
+        tmp = Path("/tmp/sandbox")
+        if not tmp.exists():
+            shutil.copytree(Path(__file__).parent / "sandbox", tmp)
+        os.environ["FILES_SANDBOX"] = str(tmp)
     from servers.files_server import mcp as server
 else:
     from servers.deploy_server import mcp as server
