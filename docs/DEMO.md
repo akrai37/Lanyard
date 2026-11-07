@@ -49,12 +49,28 @@ After 2 or 3 green ticks, click **Revoke** on the trusted-agent card.
 Click **Revoke** on `aws-worker-agent` while it works. Its next call shows **Denied** on the Overview.
 > "And because Lanyard issues its tokens, a revoked workload can't even sign in again."
 
-### 6. Close (15 seconds)
+### 6. Sub-agents: revoke one, stop the whole team (40 seconds)
+`scripts/reset_demo.sh cloud`, then run: `uv run python scripts/demo_agent.py team --delay 3`, and open **Agents**.
+> "Agents now spin up helper agents. Lanyard lets an agent create a sub-agent, but never with more access than itself: watch, the rogue-helper that asked for admin was refused. changelog-writer created its own helper, proofreader."
+
+Click **Revoke** on `trusted-agent`.
+> "One click on the parent, and every sub-agent below it is cut off too."
+
+### 7. Attack lab (30 seconds)
+Open **Attack lab** and click **Run all attacks**.
+> "These are real attacks against this live gateway: forged tokens, unsigned tokens, privilege escalation, prompt injection, replaying a revoked token. Every one is blocked, and every attempt is in the audit log."
+
+### 8. Close (15 seconds)
 > "Identity, least privilege, guardrails, human approval, instant revocation, and a full audit trail, for any MCP agent. Claude Code or Kiro can run through it unchanged."
 
 Optional, if there's time: `scripts/launch_agent.sh intern` and ask it "deploy payments-api 2.4.1 to staging". It explains it has no deploy tool.
 
+**Background traffic:** turn on `scripts/simulator.sh on` about 5 minutes before judging, so the Overview shows a busy company: five synthetic agents, each with its own AWS identity, doing normal work plus a few bad things (reading a poisoned ticket, trying tools they don't have). Turn it off afterwards with `scripts/simulator.sh off`.
+
 ## Likely judge questions
+
+- **"Is the audit log trustworthy?"** Every decision is also written to S3 with Object Lock in compliance mode. Even the AWS account owner can't delete or edit those records during retention; we tried, and AWS refused.
+- **"What happens after an agent reads an injection?"** The response is blocked, and the agent is marked tainted: its writes and deploys need human approval until an admin clears it.
 
 - **"What if the agent just gets a new token?"** Two layers. Revocation is keyed on the agent's identity, not the token, so a new token is blocked too. And Revoke also removes the agent's grant in Auth0, so Auth0 won't issue it a token in the first place. (This needs the `lanyard-admin` Auth0 app configured; the Policy page shows whether it's on.)
 - **"Where is the workload identity?"** Agents on AWS sign in with their IAM role, no stored secret. It's the same pattern HashiCorp Vault uses: the agent signs an AWS request, AWS verifies the signature, and Lanyard only trusts roles in its own account. The signature includes a Lanyard-specific header, so it can't be replayed elsewhere.

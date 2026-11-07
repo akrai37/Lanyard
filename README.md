@@ -15,11 +15,15 @@ Lanyard is a gateway between AI agents and their [MCP](https://modelcontextproto
 | **Least privilege** | Token scopes map to tools. `tools/list` only returns the tools an agent may call, and `tools/call` is enforced again server side. Unknown tools are denied by default. |
 | **Instant revocation** | Revocation is keyed on the agent's identity (Auth0 client ID or IAM role), not the token, and is checked on every request. A revoked agent gets HTTP 403 on its next call, and fetching a new token does not help. |
 | **Cut off at the source** | Revoking also removes the agent's grant in Auth0 (through the Management API), so Auth0 stops issuing it tokens; Restore recreates the grant. Revoked workload identities are refused new Lanyard tokens. |
+| **Sub-agents with cascade revoke** | An agent can create a helper with a subset of its own permissions (never more). The helper's token records its chain of parents, so revoking any agent in the chain cuts off everything below it. |
+| **Tainted agents** | When an agent reads content flagged as prompt injection, Lanyard marks it tainted: its risky calls (writes, deploys) need human approval until an admin clears it. |
 | **Per-tool admin control** | An admin can block a single tool for a single agent from the dashboard, narrowing access below what the token allows. |
 | **Human approval** | High-risk calls, such as production deploys, are held until a person approves or denies them on the dashboard. |
 | **Tool-response guardrails** | Tool output is scanned with Amazon Bedrock Guardrails before the agent's model sees it. Prompt injection hidden in data, such as a poisoned file, is blocked; emails and phone numbers are masked. |
-| **Admin console** | Live overview with decision charts, per-agent identity and tool access, an approval queue, a searchable audit log with CSV export, and the active policy. |
-| **Audit trail** | Every decision is logged with the agent, tool, arguments, outcome and reason. |
+| **Admin console** | Live overview with decision charts, per-agent identity and tool access, sub-agent trees, an approval queue, a searchable audit log with CSV export, and the active policy. |
+| **Attack lab** | Eight real attacks (forged and unsigned tokens, hidden-tool calls, default-deny bypass, sub-agent privilege escalation, prompt injection, revoked-token replay, AWS proof replay) run against the live gateway from the console. All eight are blocked. |
+| **Tamper-proof audit trail** | Every decision is logged with the agent, tool, arguments, outcome and reason, and copied through a DynamoDB stream to S3 with Object Lock in compliance mode, so no one can edit or delete it during retention. |
+| **Synthetic company + traffic simulator** | A fictional company's file share (invoices, tickets, contracts, reports, two poisoned tickets) lives in S3, and five simulated agents, each with its own IAM role, generate realistic traffic through the real checks. |
 
 ## Architecture
 
@@ -79,6 +83,9 @@ uv run python scripts/demo_agent.py intern
 uv run python scripts/demo_agent.py aws          # sign in with this machine's AWS identity
 scripts/launch_agent.sh trusted                  # Claude Code as a governed agent
 scripts/run_cloud_agent.sh                       # an agent inside AWS Lambda, no stored secret
+uv run python scripts/demo_agent.py team         # sub-agents; revoke trusted-agent to cut off all of them
+scripts/simulator.sh on|off                      # cloud traffic simulator (5 synthetic agents)
+uv run python scripts/generate_data.py --upload  # regenerate the synthetic file share
 scripts/reset_demo.sh                            # clear state between demos
 ```
 
@@ -92,7 +99,10 @@ lanyard/policy.py       backends, tool → scope map, approval rules, workload i
 lanyard/workload.py     AWS IAM workload identity (sign, verify, issue tokens)
 lanyard/auth0_admin.py  remove and restore an agent's Auth0 grant
 lanyard/guardrails.py   Bedrock Guardrails scan of tool responses
-lanyard/agent_runner.py scripted agent used on a laptop and in the cloud
+lanyard/agent_runner.py scripted agent and sub-agent team, used on a laptop and in the cloud
+lanyard/simulator.py    synthetic agents with their own IAM roles
+lanyard/attacks.py      attack lab
+lanyard/archiver.py     DynamoDB stream -> S3 Object Lock audit archive
 lanyard/store.py        state store (SQLite)
 lanyard/dynamo_store.py state store (DynamoDB)
 lanyard/dashboard.html  admin dashboard
@@ -123,6 +133,9 @@ flowchart LR
 | **Amazon Bedrock Guardrails** | Scans every tool response for prompt injection and masks emails and phone numbers. |
 | **AWS IAM** | The gateway's role can only read and write its table, read its secret, invoke the two tool functions, and apply the guardrail. The tool functions have no public URL, so tools cannot be reached without going through Lanyard. The worker agent's role has no permissions at all: its identity is all it needs. |
 | **AWS STS** | Verifies workload identity: Lanyard forwards the agent's signed `GetCallerIdentity` request, and AWS confirms which role signed it. |
+| **Amazon S3** | The company file share (private, encrypted) and the audit archive (Object Lock, compliance mode). |
+| **DynamoDB Streams** | Feed every new audit event to the archiver Lambda. |
+| **Amazon EventBridge** | Starts the traffic simulator every minute when it is switched on. |
 | **AWS Secrets Manager** | Holds the gateway's secrets: the workload token signing key, the admin password, and the optional Auth0 management credential. |
 
 Agents' Auth0 client secrets are never deployed; the gateway verifies their tokens with Auth0's public keys.
