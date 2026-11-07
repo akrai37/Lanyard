@@ -37,7 +37,7 @@ flowchart LR
     D --- UI["Admin dashboard"]
 ```
 
-The gateway holds no state of its own. Revocations, admin blocks, pending approvals and the audit log all live in the store, so several gateway instances can enforce the same decisions. The store is SQLite locally; DynamoDB is the production target behind the same interface.
+The gateway holds no state of its own. Revocations, admin blocks, pending approvals and the audit log all live in the store, so any number of gateway instances enforce the same decisions. The store is SQLite for local development and DynamoDB in the cloud, behind the same interface. Security-relevant reads from DynamoDB are strongly consistent: a revocation written through one instance blocks the agent's next call on every other instance.
 
 ## Security decisions
 
@@ -74,6 +74,8 @@ scripts/launch_agent.sh trusted                  # Claude Code as a governed age
 scripts/reset_demo.sh                            # clear state between demos
 ```
 
+Any of these work against the cloud deployment by setting `LANYARD_URL` to its URL.
+
 ## Project layout
 
 ```
@@ -81,18 +83,41 @@ lanyard/gateway.py      MCP endpoint, authorization pipeline, admin API
 lanyard/policy.py       backends, tool → scope map, approval rules
 lanyard/guardrails.py   Bedrock Guardrails scan of tool responses
 lanyard/store.py        state store (SQLite)
+lanyard/dynamo_store.py state store (DynamoDB)
 lanyard/dashboard.html  admin dashboard
-servers/                mock MCP tool servers (files, deploy) and sample data
-scripts/                start, reset, token helper, scripted and Claude Code agents
+lanyard/lambda_handler.py   gateway entry point on AWS Lambda
+servers/                mock MCP tool servers (files, deploy), their Lambda entry point, sample data
+scripts/                start, reset, deploy, token helper, scripted and Claude Code agents
 ```
 
 ## On AWS
 
-Lanyard uses Amazon Bedrock Guardrails today. The production path is the gateway on AWS App Runner or ECS behind a load balancer, with revocations, approvals and the audit log in DynamoDB so that every instance enforces a revocation immediately. Amazon Bedrock AgentCore Gateway and AgentCore Identity offer a managed version of the identity layer; Lanyard's policy engine, approval flow and response scanning are designed to sit alongside them.
+```mermaid
+flowchart LR
+    A["AI agent"] -- "HTTPS + JWT" --> U["Lambda function URL"]
+    U --> G["lanyard-gateway<br/>(Lambda)"]
+    G -- "lambda:InvokeFunction<br/>(IAM, no public URL)" --> F["lanyard-files<br/>(Lambda)"]
+    G -- "lambda:InvokeFunction" --> D["lanyard-deploy<br/>(Lambda)"]
+    G <--> T[("DynamoDB<br/>revocations, approvals, audit")]
+    G -- "ApplyGuardrail" --> B["Amazon Bedrock<br/>Guardrails"]
+```
+
+| Service | Role in Lanyard |
+|---|---|
+| **AWS Lambda** | Runs the gateway and both tool servers. Lambda scales the gateway out on demand; because it is stateless, every copy enforces the same decisions. |
+| **Lambda function URL** | The gateway's public HTTPS endpoint. Agents authenticate with their JWT; the dashboard and admin API require a password. |
+| **Amazon DynamoDB** | Shared state: revocations, admin tool blocks, pending approvals, and the audit log. Strongly consistent reads make revocation immediate across instances. |
+| **Amazon Bedrock Guardrails** | Scans every tool response for prompt injection and masks emails and phone numbers. |
+| **AWS IAM** | The gateway's role can only read and write its table, invoke the two tool functions, and apply the guardrail. The tool functions have no public URL, so tools cannot be reached without going through Lanyard. |
+
+No Auth0 client secrets are deployed: the gateway only verifies tokens, using Auth0's public keys.
+
+**Deploy:** `scripts/build_lambda.sh && uv run python scripts/deploy_aws.py`. This creates or updates the roles and functions, prints the dashboard URL, and saves the URL and a generated admin password to `.env`. It expects a DynamoDB table named `lanyard` with string keys `pk` (partition) and `sk` (sort).
+
+Amazon Bedrock AgentCore Gateway and AgentCore Identity offer a managed version of the identity layer; Lanyard's policy engine, approval flow and response scanning are designed to sit alongside them.
 
 ## Roadmap
 
-- DynamoDB store and multi-instance deployment
 - Revoking the agent's grant in Auth0 as well, so no new tokens are issued
 - Delegated access: an agent acting for a signed-in user gets the intersection of both sets of permissions (OAuth token exchange)
 - Rate limits and automatic revocation when an agent's denial rate spikes

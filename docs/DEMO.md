@@ -2,11 +2,20 @@
 
 ## Before judges arrive
 
-1. Refresh AWS credentials (they expire every few hours): paste the new `export AWS_...` lines from the event page into a terminal, then run the 4 `aws configure set ... --profile hackathon` lines.
-2. Start everything: `scripts/start.sh` (leave this terminal running).
-3. Reset: `scripts/reset_demo.sh`
-4. Screen layout: dashboard (http://127.0.0.1:8000) on the left, one terminal on the right, in the `Lanyard` folder.
-5. Warm-up run, so tokens are cached and nothing is slow: `uv run python scripts/demo_agent.py intern --delay 0`, then `scripts/reset_demo.sh` again.
+**Use the cloud version.** It runs on AWS with its own permissions, so it keeps working when your laptop's AWS credentials expire, and you can say "this is live on AWS."
+
+1. In the terminal, in the `Lanyard` folder, point the agent at the cloud:
+   `export LANYARD_URL=$(grep '^LANYARD_CLOUD_URL=' .env | cut -d= -f2)`
+2. Reset: `scripts/reset_demo.sh cloud`
+3. Open the dashboard: the `LANYARD_CLOUD_URL` from `.env`, followed by `/`. Log in as `admin` with the `LANYARD_CLOUD_ADMIN_PASSWORD` from `.env`.
+4. Screen layout: dashboard on the left, the terminal on the right.
+5. Warm-up run, so the cloud is warm and tokens are cached: `uv run python scripts/demo_agent.py intern --delay 0`, then `scripts/reset_demo.sh cloud` again.
+
+In every step below, use `scripts/reset_demo.sh cloud` instead of `scripts/reset_demo.sh`.
+
+**Backup (local) version:** `scripts/start.sh`, dashboard at http://127.0.0.1:8000, and don't set `LANYARD_URL`. Refresh your AWS credentials first (the 4 `aws configure set ... --profile hackathon` lines); without them, the guardrail scan withholds every tool response.
+
+**The AWS event account is deleted after the event**, along with the cloud version. The local version always works.
 
 ## The demo
 
@@ -42,6 +51,8 @@ Optional, if there's time: `scripts/launch_agent.sh intern` and ask it "deploy p
 
 - **"What if the agent just gets a new token?"** Revocation is keyed on the agent's client ID, not the token, so new tokens are refused too. Next step: also remove the agent's grant in Auth0 so it can't get tokens at all.
 - **"What about a call already in progress when you revoke?"** It completes; revocation applies from the next call. Holding high-risk calls for approval covers the dangerous ones.
-- **"Does this scale?"** The gateway is stateless; all decisions read from a shared store. Locally it's SQLite; in production, DynamoDB, so every instance enforces a revocation immediately.
+- **"Does this scale?"** "It's running on AWS Lambda right now, which runs as many copies of the gateway as traffic needs. The gateway is stateless; revocations live in DynamoDB with strongly consistent reads, so a revoke reaches every copy on the next call. We tested two gateways: revoke through one, and the other blocked the agent immediately."
+- **"Can an agent skip Lanyard and call the tools directly?"** No. The tool servers are private Lambda functions with no public URL; only the gateway's IAM role can invoke them.
+- **"Where are the secrets?"** The cloud gateway has no Auth0 secrets at all. It only verifies tokens using Auth0's public keys.
 - **"Why not just AgentCore?"** AgentCore Identity and Gateway are the managed AWS path for authentication. Lanyard adds the policy layer on top: per-tool admin control, human approval, response scanning and the audit trail.
 - **"What if Bedrock is down?"** It fails closed: tool responses are withheld rather than passed through unchecked.

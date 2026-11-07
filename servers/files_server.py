@@ -1,10 +1,11 @@
 """Mock 'files' MCP server. Reads and writes inside servers/sandbox only."""
 
+import os
 from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
-SANDBOX = (Path(__file__).parent / "sandbox").resolve()
+SANDBOX = Path(os.environ.get("FILES_SANDBOX", Path(__file__).parent / "sandbox")).resolve()
 SANDBOX.mkdir(exist_ok=True)
 
 mcp = MCPServer("files", instructions="Company file share.")
