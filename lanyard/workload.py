@@ -76,9 +76,10 @@ def role_from_arn(arn: str) -> tuple[str, str] | None:
     return (m.group(1), m.group(2)) if m else None
 
 
-def issue_token(key: str, audience: str, agent_id: str, name: str, scopes: list[str], arn: str) -> tuple[str, int]:
+def issue_token(sign, audience: str, agent_id: str, name: str, scopes: list[str], arn: str) -> tuple[str, int]:
+    """sign: a function that turns claims into a signed token (AWS KMS, or HMAC locally)."""
     now = int(time.time())
     claims = {"iss": LANYARD_ISSUER, "aud": audience, "sub": agent_id, "azp": agent_id,
               "scope": " ".join(scopes), "iat": now, "exp": now + TOKEN_TTL_SECONDS,
               "lanyard_identity": "aws-iam", "lanyard_name": name, "lanyard_arn": arn}
-    return jwt.encode(claims, key, algorithm="HS256"), TOKEN_TTL_SECONDS
+    return sign(claims), TOKEN_TTL_SECONDS

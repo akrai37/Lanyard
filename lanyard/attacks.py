@@ -19,6 +19,9 @@ ATTACKS = [
     {"id": "unsigned-token", "title": "Unsigned token (alg: none)",
      "goal": "Send a token with no signature at all and hope the gateway skips the check.",
      "defense": "Each issuer is pinned to one algorithm; 'none' is never accepted."},
+    {"id": "alg-confusion", "title": "Algorithm confusion",
+     "goal": "Lanyard's public key is published. Use it as an HMAC secret to sign my own Lanyard token (HS256).",
+     "defense": "Lanyard tokens are RS256, signed in AWS KMS; HS256 is never accepted when KMS is configured."},
     {"id": "scope-bypass", "title": "Call a hidden tool directly",
      "goal": "As a read-only agent, call deploy_service even though it isn't in my tool list.",
      "defense": "Every tools/call is authorized again on the server, not just hidden from the list."},
@@ -66,6 +69,19 @@ async def run_attack(attack_id: str, base: str, http: httpx.AsyncClient, ctx: di
                  if attack_id == "forged-token" else jwt.encode(claims, None, algorithm="none"))
         status, text, _ = await tool(token, "deploy_service",
                                      {"service": "payments-api", "version": "6.6.6", "environment": "production"})
+        return {"blocked": status == 401, "observed": f"HTTP {status}: {text}"}
+
+    if attack_id == "alg-confusion":
+        pem = ctx.get("public_key_pem")
+        if not pem:
+            return {"blocked": None, "observed": "Skipped: tokens are not signed with a public-key algorithm here."}
+        claims = {"iss": "lanyard", "aud": ctx["audience"], "azp": "forged-admin", "sub": "forged-admin",
+                  "scope": "files:read files:write deploy:run", "iat": now, "exp": now + 600}
+        import base64, hashlib, hmac, json as _json
+        b = lambda d: base64.urlsafe_b64encode(d).rstrip(b"=").decode()  # noqa: E731
+        head = b(_json.dumps({"alg": "HS256", "typ": "JWT"}).encode()) + "." + b(_json.dumps(claims).encode())
+        token = head + "." + b(hmac.new(pem.encode(), head.encode(), hashlib.sha256).digest())
+        status, text, _ = await tool(token, "list_files", {})
         return {"blocked": status == 401, "observed": f"HTTP {status}: {text}"}
 
     if attack_id == "scope-bypass":

@@ -648,6 +648,7 @@ const VIEWS = {
               <dt>Agent sign-in</dt><dd>OAuth 2.0 client credentials, RS256 JWT verified against Auth0's public keys</dd>
               <dt>Workloads</dt><dd>${p.workloads.length ? `AWS IAM roles in account <span class="mono">${esc(p.aws_account)}</span>, ${p.workload_token_minutes}-minute Lanyard tokens` : "not enabled"}</dd>
               ${p.files_bucket ? `<dt>File share</dt><dd>Amazon S3 · <span class="mono">${esc(p.files_bucket)}</span> (private, encrypted)</dd>` : ""}
+              ${p.token_signing ? `<dt>Lanyard tokens</dt><dd>${esc(p.token_signing)} · <a href="/.well-known/jwks.json" target="_blank">public key</a></dd>` : ""}
               <dt>Revocation key</dt><dd>The agent's identity (client ID or IAM role), not its token</dd>
             </dl></div>
           <div class="panel"><div class="panel-h"><h3>Safeguards</h3></div><div class="checks">

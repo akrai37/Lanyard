@@ -24,6 +24,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from . import workload
+from .tokens import TokenSigner
 from .auth0_admin import Auth0Admin
 from .guardrails import ToolResponseGuard
 from .policy import (APPROVAL_TIMEOUT_SECONDS, BACKENDS, MAX_DELEGATION_DEPTH, RISKY_SCOPES, TOOL_SCOPES,
@@ -67,7 +68,7 @@ _lambda = None
 app = FastAPI(title="Lanyard")
 
 # Workload identity (AWS IAM roles): Lanyard signs its own short-lived tokens with this key.
-SIGNING_KEY = ENV.get("LANYARD_SIGNING_KEY")
+SIGNER = TokenSigner(ENV.get("LANYARD_KMS_KEY_ID"), ENV.get("LANYARD_SIGNING_KEY"), AWS_PROFILE, AWS_REGION)
 AWS_ACCOUNT = ENV.get("LANYARD_AWS_ACCOUNT")
 
 # Optional: Amazon Verified Permissions (Cedar) makes the authorization decisions. Fails closed.
@@ -103,7 +104,7 @@ def agent_name(agent_id: str) -> str:
 async def admin_auth(request: Request, call_next):
     """Dashboard and admin API require a password when LANYARD_ADMIN_PASSWORD is set.
     The /mcp endpoint is protected separately, by the agent's JWT."""
-    if ADMIN_PASSWORD and not request.url.path.startswith(("/mcp", "/auth/")):
+    if ADMIN_PASSWORD and not request.url.path.startswith(("/mcp", "/auth/", "/.well-known/")):
         ok = False
         auth = request.headers.get("authorization", "")
         if auth.lower().startswith("basic "):
@@ -145,12 +146,12 @@ def denied_tool_result(message):
 
 async def verify_token(token: str) -> dict:
     """Two trusted issuers, each pinned to its own algorithm and key:
-    Auth0 (RS256, public JWKS) and Lanyard itself for workload identities (HS256, private key)."""
+    Auth0 (RS256, Auth0's public keys) and Lanyard itself (RS256 signed in AWS KMS; HS256 only without KMS)."""
     issuer = jwt.decode(token, options={"verify_signature": False}).get("iss")
     if issuer == workload.LANYARD_ISSUER:
-        if not SIGNING_KEY:
+        if not SIGNER.enabled:
             raise jwt.InvalidTokenError("workload identity is not enabled")
-        return jwt.decode(token, SIGNING_KEY, algorithms=["HS256"], audience=AUDIENCE, issuer=workload.LANYARD_ISSUER)
+        return await asyncio.to_thread(SIGNER.verify, token, AUDIENCE, workload.LANYARD_ISSUER)
     key = await asyncio.to_thread(jwks.get_signing_key_from_jwt, token)
     return jwt.decode(token, key.key, algorithms=["RS256"], audience=AUDIENCE, issuer=ISSUER)
 
@@ -380,7 +381,7 @@ async def mcp_endpoint(request: Request):
 @app.post("/auth/aws")
 async def auth_aws(request: Request):
     """Workload identity: exchange a signed sts:GetCallerIdentity request for a short-lived Lanyard token."""
-    if not (SIGNING_KEY and AWS_ACCOUNT):
+    if not (SIGNER.enabled and AWS_ACCOUNT):
         return JSONResponse({"error": "workload identity is not enabled"}, status_code=404)
     t0 = time.perf_counter()
 
@@ -405,7 +406,8 @@ async def auth_aws(request: Request):
         log("deny", "token request refused: identity revoked", agent_id, mapping["name"], arn=arn)
         return JSONResponse({"error": "this identity has been revoked"}, status_code=403)
 
-    token, ttl = workload.issue_token(SIGNING_KEY, AUDIENCE, agent_id, mapping["name"], mapping["scopes"], arn)
+    token, ttl = await asyncio.to_thread(workload.issue_token, SIGNER.sign, AUDIENCE, agent_id, mapping["name"],
+                                         mapping["scopes"], arn)
     store.seen_agent(agent_id, mapping["name"], sorted(mapping["scopes"]), "aws-iam")
     log("allow", f"AWS IAM identity verified; issued {ttl // 60}-minute token", agent_id, mapping["name"], arn=arn)
     return {"access_token": token, "token_type": "Bearer", "expires_in": ttl}
@@ -416,7 +418,7 @@ async def auth_delegate(request: Request):
     """Sub-agents: an agent creates a helper with a subset of its own permissions.
     The helper's token records its full chain of parents, so revoking any of them cuts it off too."""
     t0 = time.perf_counter()
-    if not SIGNING_KEY:
+    if not SIGNER.enabled:
         return JSONResponse({"error": "delegation is not enabled"}, status_code=404)
     auth = request.headers.get("authorization", "")
     try:
@@ -460,10 +462,10 @@ async def auth_delegate(request: Request):
     child_id = f"{child}@{parent_id}"
     child_name = f"{parent_name} › {child}"
     exp = min(int(parent["exp"]), now + int(body.get("ttl_seconds") or 900))
-    token = jwt.encode({"iss": workload.LANYARD_ISSUER, "aud": AUDIENCE, "sub": child_id, "azp": child_id,
-                        "scope": " ".join(sorted(wanted)), "iat": now, "exp": exp,
-                        "lanyard_identity": "delegated", "lanyard_name": child_name, "lanyard_chain": chain},
-                       SIGNING_KEY, algorithm="HS256")
+    token = await asyncio.to_thread(SIGNER.sign, {
+        "iss": workload.LANYARD_ISSUER, "aud": AUDIENCE, "sub": child_id, "azp": child_id,
+        "scope": " ".join(sorted(wanted)), "iat": now, "exp": exp,
+        "lanyard_identity": "delegated", "lanyard_name": child_name, "lanyard_chain": chain})
     store.seen_agent(child_id, child_name, sorted(wanted), "delegated", parent=parent_id)
     log("allow", f"created sub-agent '{child}' with {', '.join(sorted(wanted)) or 'no'} permissions",
         child_id, child_name, parent=parent_id, chain=chain)
@@ -545,7 +547,8 @@ async def policy():
     return {
         "tools": [{"name": t, "scope": s, "server": server_of.get(t), "approval": APPROVAL_RULES.get(t)}
                   for t, s in TOOL_SCOPES.items()],
-        "workloads": [{"role": r, **w} for r, w in WORKLOAD_IDENTITIES.items()] if SIGNING_KEY else [],
+        "workloads": [{"role": r, **w} for r, w in WORKLOAD_IDENTITIES.items()] if SIGNER.enabled else [],
+        "token_signing": "AWS KMS (RS256, key never leaves KMS)" if SIGNER.kms_key_id else "HMAC (HS256)",
         "aws_account": AWS_ACCOUNT,
         "auth0_domain": DOMAIN,
         "auth0_cutoff": auth0_admin is not None,
@@ -564,6 +567,20 @@ async def policy():
     }
 
 
+def _public_key_pem() -> str | None:
+    if not SIGNER.kms_key_id:
+        return None
+    from cryptography.hazmat.primitives import serialization
+    return SIGNER._load_public_key().public_bytes(serialization.Encoding.PEM,
+                                                  serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
+
+@app.get("/.well-known/jwks.json")
+async def lanyard_jwks():
+    """Public key for Lanyard-issued tokens, so other services can verify them."""
+    return await asyncio.to_thread(SIGNER.jwks)
+
+
 @app.get("/api/attacks")
 async def list_attacks():
     from .attacks import ATTACKS
@@ -574,15 +591,14 @@ async def list_attacks():
 async def run_attack(attack_id: str, request: Request):
     from . import attacks
 
-    if not SIGNING_KEY:
-        return JSONResponse({"error": "the attack lab needs LANYARD_SIGNING_KEY"}, status_code=400)
+    if not SIGNER.enabled:
+        return JSONResponse({"error": "the attack lab needs LANYARD_KMS_KEY_ID or LANYARD_SIGNING_KEY"}, status_code=400)
 
     def mint(scopes: list[str]) -> str:
         now = int(time.time())
-        return jwt.encode({"iss": workload.LANYARD_ISSUER, "aud": AUDIENCE, "sub": attacks.RED_TEAM_ID,
-                           "azp": attacks.RED_TEAM_ID, "scope": " ".join(scopes), "iat": now, "exp": now + 600,
-                           "lanyard_identity": "red-team", "lanyard_name": attacks.RED_TEAM_ID},
-                          SIGNING_KEY, algorithm="HS256")
+        return SIGNER.sign({"iss": workload.LANYARD_ISSUER, "aud": AUDIENCE, "sub": attacks.RED_TEAM_ID,
+                            "azp": attacks.RED_TEAM_ID, "scope": " ".join(scopes), "iat": now, "exp": now + 600,
+                            "lanyard_identity": "red-team", "lanyard_name": attacks.RED_TEAM_ID})
 
     def sign_proof(audience: str):
         try:
@@ -591,6 +607,7 @@ async def run_attack(attack_id: str, request: Request):
             return None
 
     ctx = {"audience": AUDIENCE, "auth0_issuer": ISSUER, "mint": mint, "guardrail": guard is not None,
+           "public_key_pem": _public_key_pem(),
            "revoke": lambda a: store.revoke(a, reason="attack lab"), "restore": store.restore, "sign_proof": sign_proof}
     try:
         result = await attacks.run_attack(attack_id, str(request.base_url).rstrip("/"), http, ctx)

@@ -31,6 +31,8 @@ TABLE = ENV.get("LANYARD_TABLE", "lanyard")
 FILES_BUCKET = f"lanyard-files-{ACCOUNT}"
 AUDIT_BUCKET = f"lanyard-audit-{ACCOUNT}"
 SIM_KINDS = ["billing", "support", "analytics", "release", "research"]
+KMS_KEY_ARN = (session.client("kms").describe_key(KeyId=ENV["LANYARD_KMS_KEY_ID"])["KeyMetadata"]["Arn"]
+               if ENV.get("LANYARD_KMS_KEY_ID") else None)
 
 TRUST = json.dumps({"Version": "2012-10-17", "Statement": [{
     "Effect": "Allow", "Principal": {"Service": "lambda.amazonaws.com"}, "Action": "sts:AssumeRole"}]})
@@ -104,11 +106,10 @@ def gateway_secret(password: str) -> str:
         current = json.loads(sm.get_secret_value(SecretId=name)["SecretString"])
     except sm.exceptions.ResourceNotFoundException:
         current = {}
-    value = {
-        "LANYARD_ADMIN_PASSWORD": password,
-        # Cloud-only key for workload tokens; kept across deploys so issued tokens stay valid.
-        "LANYARD_SIGNING_KEY": current.get("LANYARD_SIGNING_KEY") or secrets.token_urlsafe(48),
-    }
+    value = {"LANYARD_ADMIN_PASSWORD": password}
+    if not ENV.get("LANYARD_KMS_KEY_ID"):
+        # Without KMS, workload tokens are HMAC-signed; keep the key across deploys.
+        value["LANYARD_SIGNING_KEY"] = current.get("LANYARD_SIGNING_KEY") or secrets.token_urlsafe(48)
     if ENV.get("AUTH0_ADMIN_CLIENT_ID") and ENV.get("AUTH0_ADMIN_CLIENT_SECRET"):
         value["AUTH0_ADMIN_CLIENT_ID"] = ENV["AUTH0_ADMIN_CLIENT_ID"]
         value["AUTH0_ADMIN_CLIENT_SECRET"] = ENV["AUTH0_ADMIN_CLIENT_SECRET"]
@@ -207,6 +208,8 @@ def main():
         {"Effect": "Allow", "Action": ["verifiedpermissions:IsAuthorized", "verifiedpermissions:ListPolicies",
                                        "verifiedpermissions:GetPolicy"],
          "Resource": f"arn:aws:verifiedpermissions::{ACCOUNT}:policy-store/*"},
+        *([{"Effect": "Allow", "Action": ["kms:Sign", "kms:GetPublicKey"], "Resource": KMS_KEY_ARN}]
+          if KMS_KEY_ARN else []),
         {"Effect": "Allow", "Action": "bedrock:ApplyGuardrail",
          "Resource": f"arn:aws:bedrock:{REGION}:{ACCOUNT}:guardrail/*"},
     ]})
@@ -224,6 +227,7 @@ def main():
         "LANYARD_SECRET_ID": "lanyard/gateway",
         "LANYARD_AWS_ACCOUNT": ACCOUNT,
         "LANYARD_AUDIT_BUCKET": AUDIT_BUCKET,
+        **({"LANYARD_KMS_KEY_ID": ENV["LANYARD_KMS_KEY_ID"]} if ENV.get("LANYARD_KMS_KEY_ID") else {}),
         **({"LANYARD_AVP_POLICY_STORE": ENV["LANYARD_AVP_POLICY_STORE"]} if ENV.get("LANYARD_AVP_POLICY_STORE") else {}),
         "LANYARD_FILES_BUCKET": FILES_BUCKET,
     }
