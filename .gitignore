@@ -2,3 +2,6 @@
 *.db
 __pycache__/
 .venv/
+.tokens/
+*.db-shm
+*.db-wal

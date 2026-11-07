@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lanyard Control</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280; --line: #e5e7eb;
+    --allow: #15803d; --allow-bg: #dcfce7; --deny: #b91c1c; --deny-bg: #fee2e2;
+    --admin: #1d4ed8; --admin-bg: #dbeafe; --off: #9ca3af; --off-bg: #f3f4f6; --accent: #111827;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --panel: #161b22; --text: #e6edf3; --muted: #8b949e; --line: #30363d;
+      --allow: #3fb950; --allow-bg: #12261a; --deny: #f85149; --deny-bg: #2d1416;
+      --admin: #58a6ff; --admin-bg: #102038; --off: #6e7681; --off-bg: #1c2128; --accent: #e6edf3;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 16px 24px;
+           border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+  header .sub { color: var(--muted); }
+  .stats { margin-left: auto; display: flex; gap: 20px; }
+  .stat b { font-size: 20px; display: block; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 20px; padding: 20px 24px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } .stats { display: none; } }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .card.revoked { border-color: var(--deny); }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .name { font-weight: 600; font-size: 15px; }
+  .id { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .badge.active { color: var(--allow); background: var(--allow-bg); }
+  .badge.revoked { color: var(--deny); background: var(--deny-bg); }
+  button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line);
+           background: var(--panel); color: var(--text); padding: 6px 12px; }
+  button.revoke { margin-left: auto; background: var(--deny); color: #fff; border-color: var(--deny); font-weight: 600; }
+  button.restore { margin-left: auto; }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .tool { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 4px 9px; border-radius: 6px; border: 1px solid transparent; }
+  .tool.allowed { color: var(--allow); background: var(--allow-bg); }
+  .tool.blocked { color: var(--deny); background: var(--deny-bg); text-decoration: line-through; }
+  .tool.no-scope { color: var(--off); background: var(--off-bg); cursor: not-allowed; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 0 10px 8px; }
+  td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  td.t { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.action { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  .pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; }
+  .pill.allow { color: var(--allow); background: var(--allow-bg); }
+  .pill.deny, .pill.error { color: var(--deny); background: var(--deny-bg); }
+  .pill.admin { color: var(--admin); background: var(--admin-bg); }
+  tr.fresh { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { background: var(--admin-bg); } to { background: transparent; } }
+  .feed { max-height: calc(100vh - 150px); overflow: auto; }
+  .empty { color: var(--muted); padding: 24px 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🪪 Lanyard</h1>
+  <span class="sub">Identity and access control for AI agents</span>
+  <div class="stats">
+    <div class="stat"><b id="s-allow">0</b><span>allowed</span></div>
+    <div class="stat"><b id="s-deny">0</b><span>denied</span></div>
+    <div class="stat"><b id="s-agents">0</b><span>agents</span></div>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Agents</h2>
+    <div id="agents"><div class="card hint">No agents yet. They appear here after their first request.</div></div>
+    <p class="hint">Click a green tool to block it for that agent; click again to allow. Changes apply on the agent's next call.</p>
+  </section>
+  <section>
+    <h2>Live audit log</h2>
+    <div class="card feed">
+      <table>
+        <thead><tr><th>Time</th><th>Agent</th><th>Action</th><th>Decision</th><th>Reason</th></tr></thead>
+        <tbody id="events"><tr><td colspan="5" class="empty">Waiting for agent traffic…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+let lastId = 0, first = true;
+const counts = { allow: 0, deny: 0 };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const time = ts => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
+const ago = ts => { const s = Math.round(Date.now() / 1000 - ts); return s < 60 ? `${s}s ago` : `${Math.round(s / 60)}m ago`; };
+
+async function post(url) { await fetch(url, { method: "POST" }); tick(); }
+
+function renderAgents(agents) {
+  document.getElementById("s-agents").textContent = agents.length;
+  if (!agents.length) return;
+  document.getElementById("agents").innerHTML = agents.map(a => {
+    const id = encodeURIComponent(a.agent_id);
+    const tools = a.tools.map(t => {
+      const title = t.status === "no-scope" ? `needs scope ${t.scope} (not in token)` : `requires ${t.scope}`;
+      const click = t.status === "no-scope" ? "" : `onclick="post('/api/agents/${id}/tools/${t.name}/toggle')"`;
+      return `<span class="tool ${t.status}" title="${esc(title)}" ${click}>${esc(t.name)}</span>`;
+    }).join("");
+    return `<div class="card ${a.revoked ? "revoked" : ""}">
+      <div class="row">
+        <span class="name">${esc(a.name)}</span>
+        <span class="badge ${a.revoked ? "revoked" : "active"}">${a.revoked ? "REVOKED" : "ACTIVE"}</span>
+        ${a.revoked
+          ? `<button class="restore" onclick="post('/api/agents/${id}/restore')">Restore</button>`
+          : `<button class="revoke" onclick="post('/api/agents/${id}/revoke')">Revoke</button>`}
+      </div>
+      <div class="id">${esc(a.agent_id)}</div>
+      <div class="tools">${tools}</div>
+      <div class="meta">Token scopes: ${esc(a.scopes) || "none"} · last seen ${ago(a.last_seen)}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderEvents(events) {
+  if (!events.length) return;
+  const body = document.getElementById("events");
+  if (lastId === 0) body.innerHTML = "";
+  for (const e of events) {
+    if (e.decision in counts) counts[e.decision]++;
+    const action = e.method === "tools/call" ? e.tool : e.method === "admin" ? (e.tool ? `admin: ${e.tool}` : "admin") : e.method;
+    const tr = document.createElement("tr");
+    if (!first) tr.className = "fresh";
+    tr.innerHTML = `<td class="t">${time(e.ts)}</td><td>${esc(e.agent_name)}</td><td class="action">${esc(action)}</td>
+      <td><span class="pill ${esc(e.decision)}">${esc(e.decision)}</span></td><td>${esc(e.reason)}</td>`;
+    body.prepend(tr);
+    lastId = e.id;
+  }
+  document.getElementById("s-allow").textContent = counts.allow;
+  document.getElementById("s-deny").textContent = counts.deny;
+}
+
+async function tick() {
+  try {
+    const r = await fetch(`/api/state?after=${lastId}`);
+    const s = await r.json();
+    renderAgents(s.agents);
+    renderEvents(s.events);
+    first = false;
+  } catch (e) { /* gateway restarting; try again next tick */ }
+}
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
