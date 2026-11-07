@@ -390,7 +390,7 @@ async def state(after: int = 0):
                 status = "allowed"
             tools.append({"name": t, "scope": scope, "status": status})
         agents.append(a | {"revoked": store.revocation(a["agent_id"]), "tools": tools})
-    return {"agents": agents, "approvals": store.pending_approvals(), "events": store.events(after)}
+    return {"agents": agents, "approvals": store.pending_approvals(), "events": store.events(after, 1000 if after == 0 else 200)}
 
 
 @app.post("/api/approvals/{approval_id}/{decision}")
@@ -403,6 +403,31 @@ async def decide(approval_id: int, decision: str):
     store.log(agent_id=a["agent_id"], agent_name=a["agent_name"], method="admin", tool=a["tool"],
               decision="admin", reason=f"human {'approved' if decision == 'approve' else 'denied'} {a['tool']}")
     return {"ok": True}
+
+
+@app.get("/api/policy")
+async def policy():
+    from .policy import APPROVAL_RULES
+    server_of = {}
+    try:
+        names = {url: name for name, url in BACKENDS.items()}
+        server_of = {tool: names.get(url, "?") for tool, (url, _) in (await tool_catalog()).items()}
+    except Exception:  # tool servers unreachable: still show the policy
+        pass
+    return {
+        "tools": [{"name": t, "scope": s, "server": server_of.get(t), "approval": APPROVAL_RULES.get(t)}
+                  for t, s in TOOL_SCOPES.items()],
+        "workloads": [{"role": r, **w} for r, w in WORKLOAD_IDENTITIES.items()] if SIGNING_KEY else [],
+        "aws_account": AWS_ACCOUNT,
+        "auth0_domain": DOMAIN,
+        "auth0_cutoff": auth0_admin is not None,
+        "guardrail": guard is not None,
+        "guardrail_fail": "open" if GUARD_FAIL_OPEN else "closed",
+        "store": "DynamoDB" if ENV.get("LANYARD_STORE") == "dynamo" else "SQLite",
+        "environment": "AWS Lambda" if os.environ.get("AWS_LAMBDA_FUNCTION_NAME") else "Local",
+        "approval_timeout": APPROVAL_TIMEOUT_SECONDS,
+        "workload_token_minutes": workload.TOKEN_TTL_SECONDS // 60,
+    }
 
 
 @app.post("/api/reset")

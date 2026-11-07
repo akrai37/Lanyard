@@ -3,183 +3,689 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lanyard Control</title>
+<title>Lanyard Console</title>
 <style>
   :root {
-    --bg: #f6f7f9; --panel: #ffffff; --text: #16181d; --muted: #6b7280; --line: #e5e7eb;
-    --allow: #15803d; --allow-bg: #dcfce7; --deny: #b91c1c; --deny-bg: #fee2e2;
-    --admin: #1d4ed8; --admin-bg: #dbeafe; --off: #9ca3af; --off-bg: #f3f4f6; --accent: #111827;
-    --pending: #b45309; --pending-bg: #fef3c7;
+    color-scheme: light;
+    --page: #f4f4f1; --side: #ecebe6; --surface: #fcfcfb; --raised: #ffffff;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #75736d; --grid: #e1e0d9; --axis: #c3c2b7;
+    --line: rgba(11,11,11,.10); --hover: rgba(11,11,11,.04);
+    --accent: #2a78d6; --accent-wash: #e3eefb;
+    --s-allow: #2a78d6; --s-deny: #eb6834;
+    --good: #0ca30c; --good-ink: #006300; --good-wash: #e2f4e2;
+    --crit: #d03b3b; --crit-ink: #b42323; --crit-wash: #fbe5e5;
+    --warn: #fab219; --warn-ink: #8a5a00; --warn-wash: #fdf1d6;
+    --info-ink: #1c5cab; --info-wash: #e3eefb;
+    --shadow: 0 1px 2px rgba(11,11,11,.06);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0d1117; --panel: #161b22; --text: #e6edf3; --muted: #8b949e; --line: #30363d;
-      --allow: #3fb950; --allow-bg: #12261a; --deny: #f85149; --deny-bg: #2d1416;
-      --admin: #58a6ff; --admin-bg: #102038; --off: #6e7681; --off-bg: #1c2128; --accent: #e6edf3;
-      --pending: #e3b341; --pending-bg: #2e2510;
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --side: #121211; --surface: #1a1a19; --raised: #222220;
+      --ink: #f0efec; --ink-2: #c3c2b7; --muted: #94928b; --grid: #2c2c2a; --axis: #383835;
+      --line: rgba(255,255,255,.10); --hover: rgba(255,255,255,.04);
+      --accent: #3987e5; --accent-wash: #15263d;
+      --s-allow: #3987e5; --s-deny: #d95926;
+      --good: #0ca30c; --good-ink: #3fc23f; --good-wash: #10260f;
+      --crit: #d03b3b; --crit-ink: #f07a7a; --crit-wash: #2d1515;
+      --warn: #fab219; --warn-ink: #f5c45a; --warn-wash: #2e2410;
+      --info-ink: #86b6ef; --info-wash: #15263d;
+      --shadow: none;
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --side: #121211; --surface: #1a1a19; --raised: #222220;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #94928b; --grid: #2c2c2a; --axis: #383835;
+    --line: rgba(255,255,255,.10); --hover: rgba(255,255,255,.04);
+    --accent: #3987e5; --accent-wash: #15263d;
+    --s-allow: #3987e5; --s-deny: #d95926;
+    --good: #0ca30c; --good-ink: #3fc23f; --good-wash: #10260f;
+    --crit: #d03b3b; --crit-ink: #f07a7a; --crit-wash: #2d1515;
+    --warn: #fab219; --warn-ink: #f5c45a; --warn-wash: #2e2410;
+    --info-ink: #86b6ef; --info-wash: #15263d;
+    --shadow: none;
+  }
+
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
-  header { display: flex; align-items: center; gap: 16px; padding: 16px 24px;
-           border-bottom: 1px solid var(--line); background: var(--panel); }
-  header h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
-  header .sub { color: var(--muted); }
-  .stats { margin-left: auto; display: flex; gap: 20px; }
-  .stat b { font-size: 20px; display: block; line-height: 1.1; font-variant-numeric: tabular-nums; }
-  .stat span { color: var(--muted); font-size: 12px; }
-  main { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 20px; padding: 20px 24px; }
-  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 16px; } .stats { display: none; } }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
-  .card.revoked { border-color: var(--deny); }
-  .row { display: flex; align-items: center; gap: 10px; }
-  .name { font-weight: 600; font-size: 15px; }
-  .id { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-  .badge.active { color: var(--allow); background: var(--allow-bg); }
-  .badge.revoked { color: var(--deny); background: var(--deny-bg); }
-  button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line);
-           background: var(--panel); color: var(--text); padding: 6px 12px; }
-  button.revoke { margin-left: auto; background: var(--deny); color: #fff; border-color: var(--deny); font-weight: 600; }
-  button.restore { margin-left: auto; }
-  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-  .tool { font-family: ui-monospace, Menlo, monospace; font-size: 12px; padding: 4px 9px; border-radius: 6px; border: 1px solid transparent; }
-  .tool.allowed { color: var(--allow); background: var(--allow-bg); }
-  .tool.blocked { color: var(--deny); background: var(--deny-bg); text-decoration: line-through; }
-  .tool.no-scope { color: var(--off); background: var(--off-bg); cursor: not-allowed; }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 10px; }
-  .hint { color: var(--muted); font-size: 12px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 0 10px 8px; }
-  td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
-  td.t { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  td.action { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
-  .pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; }
-  .pill.allow { color: var(--allow); background: var(--allow-bg); }
-  .pill.deny, .pill.error { color: var(--deny); background: var(--deny-bg); }
-  .pill.admin { color: var(--admin); background: var(--admin-bg); }
-  .pill.pending { color: var(--pending); background: var(--pending-bg); }
-  .approval { border-color: var(--pending); background: var(--pending-bg); animation: pulse 1.4s ease-in-out infinite; }
-  .approval .what { font-family: ui-monospace, Menlo, monospace; font-size: 13px; margin: 8px 0 12px; word-break: break-word; }
-  .approval button.approve { background: var(--allow); color: #fff; border-color: var(--allow); font-weight: 600; }
-  .approval button.deny { background: var(--deny); color: #fff; border-color: var(--deny); font-weight: 600; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 4px var(--pending-bg); } }
-  tr.fresh { animation: flash 1.6s ease-out; }
-  @keyframes flash { from { background: var(--admin-bg); } to { background: transparent; } }
-  .feed { max-height: calc(100vh - 150px); overflow: auto; }
-  .empty { color: var(--muted); padding: 24px 10px; }
+  html, body { margin: 0; }
+  body { background: var(--page); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  .muted { color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* layout */
+  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+  .side { background: var(--side); border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 18px; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
+  .brand b { font-size: 16px; letter-spacing: .2px; display: block; line-height: 1.1; }
+  .brand span { font-size: 12px; color: var(--muted); }
+  .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ink-2); text-decoration: none; font-weight: 500; }
+  .nav a:hover { background: var(--hover); color: var(--ink); }
+  .nav a.on { background: var(--raised); color: var(--ink); box-shadow: var(--shadow); outline: 1px solid var(--line); }
+  .nav svg { width: 17px; height: 17px; flex: none; }
+  .nav .count { margin-left: auto; font-size: 11.5px; font-weight: 700; min-width: 20px; text-align: center; padding: 1px 6px; border-radius: 999px; background: var(--warn); color: #0b0b0b; }
+  .side-foot { margin-top: auto; border-top: 1px solid var(--line); padding: 14px 8px 0; display: grid; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .side-foot .row { display: flex; justify-content: space-between; gap: 8px; }
+  .side-foot .row span:first-child { color: var(--muted); }
+  .theme-btn { margin-top: 4px; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--ink-2); text-align: left; }
+  .theme-btn:hover { background: var(--hover); }
+
+  main { min-width: 0; }
+  .top { display: flex; align-items: center; gap: 12px; padding: 22px 32px 6px; }
+  .top h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -.2px; }
+  .desc { color: var(--muted); margin: 0 32px 18px; max-width: 760px; }
+  .live { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--surface); }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: beat 2s infinite; }
+  .live.down i { background: var(--crit); animation: none; }
+  @keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(12,163,12,.5); } 70% { box-shadow: 0 0 0 7px rgba(12,163,12,0); } 100% { box-shadow: 0 0 0 0 rgba(12,163,12,0); } }
+  #view { padding: 0 32px 40px; display: grid; gap: 18px; }
+
+  /* panels */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
+  .panel-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .panel-h h3 { font-size: 14.5px; margin: 0; font-weight: 600; }
+  .panel-h .sub { color: var(--muted); font-size: 12.5px; }
+  .panel-h .right { margin-left: auto; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; }
+  .grid2.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .tile .label { color: var(--ink-2); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .tile .label i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .tile .value { font-size: 30px; font-weight: 650; line-height: 1.15; margin-top: 6px; }
+  .tile .note { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+  /* legend + charts */
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart text { fill: var(--muted); font-size: 11px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .chart .lbl { fill: var(--ink-2); font-size: 12.5px; }
+  .chart .val { fill: var(--ink); font-size: 12.5px; font-weight: 600; }
+  .empty { color: var(--muted); padding: 26px 4px; text-align: center; }
+  .tip { position: fixed; pointer-events: none; z-index: 50; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 20px rgba(0,0,0,.18); opacity: 0; transition: opacity .1s; min-width: 120px; }
+  .tip.on { opacity: 1; }
+  .tip .t { color: var(--muted); margin-bottom: 4px; }
+  .tip .r { display: flex; align-items: center; gap: 6px; }
+  .tip .r b { margin-left: auto; padding-left: 14px; }
+  .tip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  /* pills, badges, buttons */
+  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 650; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .pill.allow { color: var(--good-ink); background: var(--good-wash); }
+  .pill.deny, .pill.error { color: var(--crit-ink); background: var(--crit-wash); }
+  .pill.pending { color: var(--warn-ink); background: var(--warn-wash); }
+  .pill.admin { color: var(--info-ink); background: var(--info-wash); }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ink-2); background: var(--raised); white-space: nowrap; }
+  .badge svg { width: 13px; height: 13px; }
+  .btn { border: 1px solid var(--line); background: var(--raised); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-weight: 550; white-space: nowrap; }
+  .btn:hover { background: var(--hover); }
+  .btn.danger { background: var(--crit); border-color: var(--crit); color: #fff; }
+  .btn.danger:hover { filter: brightness(1.08); }
+  .btn.good { background: var(--good); border-color: var(--good); color: #fff; }
+  .btn.good:hover { filter: brightness(1.08); }
+  .btn:focus-visible, .chip:focus-visible, .nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* agents */
+  .agent { padding: 0; overflow: hidden; }
+  .agent.revoked { border-color: var(--crit); }
+  .agent-h { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .avatar { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); flex: none; }
+  .avatar svg { width: 20px; height: 20px; }
+  .agent-h .name { font-weight: 650; font-size: 15.5px; }
+  .agent-h .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .agent-h .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .agent-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 0; }
+  .agent-b > div { padding: 16px 20px; min-width: 0; }
+  .agent-b > div + div { border-left: 1px solid var(--line); }
+  dl.kv { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .scopes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .scope { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; padding: 1px 7px; border-radius: 6px; background: var(--hover); border: 1px solid var(--line); }
+  .sec-title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--raised); text-align: left; cursor: pointer; }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .chip .tn { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  .chip .ts { font-size: 11px; color: var(--muted); display: block; }
+  .chip.allowed .dot { background: var(--good); }
+  .chip.blocked { background: var(--crit-wash); border-color: transparent; }
+  .chip.blocked .dot { background: var(--crit); }
+  .chip.blocked .tn { text-decoration: line-through; }
+  .chip.no-scope { cursor: not-allowed; opacity: .55; }
+  .chip.no-scope .dot { background: var(--axis); }
+  .chip:not(.no-scope):hover { border-color: var(--axis); }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
+  .agent-f { border-top: 1px solid var(--line); padding: 12px 20px; display: grid; gap: 6px; }
+
+  /* approvals */
+  .approval { border: 1px solid var(--warn); background: var(--warn-wash); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; animation: glow 1.6s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 4px var(--warn-wash); } }
+  .approval .call { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; }
+  .approval .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .approval .row .btn:first-of-type { margin-left: auto; }
+
+  /* feed + tables */
+  .feed { display: grid; }
+  .feed .ev { display: grid; grid-template-columns: 62px minmax(0, 120px) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .feed .ev:first-child { border-top: 0; }
+  .feed .ev .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .toolbar input, .toolbar select { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+  .toolbar input { flex: 1; min-width: 200px; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 550; font-size: 12px; padding: 0 10px 8px; white-space: nowrap; }
+  td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  tbody tr.ev-row { cursor: pointer; }
+  tbody tr.ev-row:hover td { background: var(--hover); }
+  tr.fresh td { animation: fresh 1.8s ease-out; }
+  @keyframes fresh { from { background: var(--accent-wash); } to { background: transparent; } }
+  td.t { white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  tr.detail td { background: var(--hover); }
+  pre.json { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2); }
+  .checks { display: grid; gap: 10px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; }
+  .check .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; }
+  .check .ic.on { background: var(--good-wash); color: var(--good-ink); }
+  .check .ic.off { background: var(--hover); color: var(--muted); }
+  .check b { display: block; font-weight: 600; }
+  .check span { color: var(--muted); font-size: 12.5px; }
+
+  .toast { position: fixed; right: 20px; bottom: 20px; z-index: 60; background: var(--ink); color: var(--page); padding: 10px 14px; border-radius: 10px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; }
+  .toast.on { opacity: 1; transform: none; }
+
+  @media (max-width: 1100px) {
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid2, .grid2.even { grid-template-columns: minmax(0, 1fr); }
+    .agent-b { grid-template-columns: minmax(0, 1fr); }
+    .agent-b > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; gap: 6px; }
+    .brand { padding: 0 8px 0 0; }
+    .brand span, .side-foot { display: none; }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px; }
+    .nav a { padding: 6px 9px; }
+    .top { padding: 18px 16px 4px; }
+    .desc { margin: 0 16px 14px; }
+    #view { padding: 0 16px 32px; }
+    .tiles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+    .feed .ev { grid-template-columns: 56px minmax(0, 1fr) auto; }
+    .feed .ev .agentc { display: none; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>🪪 Lanyard</h1>
-  <span class="sub">Identity and access control for AI agents</span>
-  <div class="stats">
-    <div class="stat"><b id="s-allow">0</b><span>allowed</span></div>
-    <div class="stat"><b id="s-deny">0</b><span>denied</span></div>
-    <div class="stat"><b id="s-agents">0</b><span>agents</span></div>
-  </div>
-</header>
-<main>
-  <section>
-    <div id="approvals"></div>
-    <h2>Agents</h2>
-    <div id="agents"><div class="card hint">No agents yet. They appear here after their first request.</div></div>
-    <p class="hint">Click a green tool to block it for that agent; click again to allow. Changes apply on the agent's next call.</p>
-  </section>
-  <section>
-    <h2>Live audit log</h2>
-    <div class="card feed">
-      <table>
-        <thead><tr><th>Time</th><th>Agent</th><th>Action</th><th>Decision</th><th>Reason</th></tr></thead>
-        <tbody id="events"><tr><td colspan="5" class="empty">Waiting for agent traffic…</td></tr></tbody>
-      </table>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l4 6 4-6"/><rect x="5" y="8" width="14" height="14" rx="2.5"/><circle cx="12" cy="13.5" r="2"/><path d="M9 18.5h6"/></svg>
+      </div>
+      <div><b>Lanyard</b><span>Agent identity console</span></div>
     </div>
-  </section>
-</main>
+    <nav class="nav" id="nav">
+      <a href="#/overview" data-r="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
+      <a href="#/agents" data-r="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M12 7V3M8.5 12h.01M15.5 12h.01M9 16h6"/></svg>Agents<span class="count" id="n-agents-rev" hidden></span></a>
+      <a href="#/approvals" data-r="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Approvals<span class="count" id="n-approvals" hidden></span></a>
+      <a href="#/audit" data-r="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Audit log</a>
+      <a href="#/policy" data-r="policy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Policy</a>
+    </nav>
+    <div class="side-foot" id="side-foot">
+      <div class="row"><span>Runs on</span><span id="f-env">…</span></div>
+      <div class="row"><span>State store</span><span id="f-store">…</span></div>
+      <div class="row"><span>Guardrails</span><span id="f-guard">…</span></div>
+      <button class="theme-btn" id="theme-btn" type="button">Theme: system</button>
+    </div>
+  </aside>
+  <main>
+    <div class="top"><h1 id="title">Overview</h1><span class="live" id="live"><i></i><span id="live-t">Live</span></span></div>
+    <p class="desc" id="desc"></p>
+    <div id="view"></div>
+  </main>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <script>
-let lastId = 0, first = true;
-const counts = { allow: 0, deny: 0 };
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const time = ts => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
-const ago = ts => { const s = Math.round(Date.now() / 1000 - ts); return s < 60 ? `${s}s ago` : `${Math.round(s / 60)}m ago`; };
+// ---------- state ----------
+const S = { agents: [], approvals: [], events: [], policy: null, lastId: 0, loaded: false };
+const expanded = new Set();
+const ICON = {
+  auth0: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>',
+  aws: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z"/></svg>',
+};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtTime = ts => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
+const ago = ts => { const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`; };
+const agoSpan = ts => `<span class="ago" data-ts="${ts}">${ago(ts)}</span>`;
+const DECISION_LABEL = { allow: "Allowed", deny: "Denied", pending: "Pending", admin: "Admin", error: "Error" };
+const pill = d => `<span class="pill ${esc(d)}">${esc(DECISION_LABEL[d] || d)}</span>`;
+const isCall = e => e.method === "tools/call" || e.method === "auth/aws" || e.method === "tools/list" || e.method === "initialize";
 
-async function post(url) { await fetch(url, { method: "POST" }); tick(); }
-
-function renderAgents(agents) {
-  document.getElementById("s-agents").textContent = agents.length;
-  if (!agents.length) return;
-  document.getElementById("agents").innerHTML = agents.map(a => {
-    const id = encodeURIComponent(a.agent_id);
-    const tools = a.tools.map(t => {
-      const title = t.status === "no-scope" ? `needs scope ${t.scope} (not in token)` : `requires ${t.scope}`;
-      const click = t.status === "no-scope" ? "" : `onclick="post('/api/agents/${id}/tools/${t.name}/toggle')"`;
-      return `<span class="tool ${t.status}" title="${esc(title)}" ${click}>${esc(t.name)}</span>`;
-    }).join("");
-    return `<div class="card ${a.revoked ? "revoked" : ""}">
-      <div class="row">
-        <span class="name">${esc(a.name)}</span>
-        <span class="badge ${a.revoked ? "revoked" : "active"}">${a.revoked ? "REVOKED" : "ACTIVE"}</span>
-        ${a.revoked
-          ? `<button class="restore" onclick="post('/api/agents/${id}/restore')">Restore</button>`
-          : `<button class="revoke" onclick="post('/api/agents/${id}/revoke')">Revoke</button>`}
-      </div>
-      <div class="id">${esc(a.agent_id)}</div>
-      <div class="tools">${tools}</div>
-      <div class="meta">Token scopes: ${esc(a.scopes) || "none"} · last seen ${ago(a.last_seen)}</div>
-    </div>`;
-  }).join("");
+function action(e) {
+  if (e.method === "tools/call") return e.tool;
+  if (e.method === "admin") return e.tool ? `admin · ${e.tool}` : "admin";
+  if (e.method === "auth/aws") return "sign-in (AWS IAM)";
+  if (e.method === "initialize") return "session start";
+  return e.method;
 }
 
-function renderApprovals(approvals) {
-  const el = document.getElementById("approvals");
-  const html = approvals.length ? `<h2>Needs your approval</h2>` + approvals.map(a => {
-    const args = Object.entries(a.arguments).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ");
-    return `<div class="card approval">
-      <div class="row"><span class="name">${esc(a.agent_name)}</span><span class="hint">waiting ${ago(a.ts).replace(" ago", "")}</span></div>
-      <div class="what">${esc(a.tool)}(${esc(args)})</div>
-      <div class="row">
-        <button class="approve" onclick="post('/api/approvals/${a.id}/approve')">Approve</button>
-        <button class="deny" onclick="post('/api/approvals/${a.id}/deny')">Deny</button>
-      </div>
-    </div>`;
-  }).join("") : "";
-  if (el.innerHTML !== html) el.innerHTML = html;
+function denyCategory(reason) {
+  const r = (reason || "").toLowerCase();
+  if (r.includes("requires scope")) return "Missing permission";
+  if (r.includes("revoked")) return "Agent revoked";
+  if (r.includes("prompt injection")) return "Prompt injection blocked";
+  if (r.includes("blocked by admin")) return "Tool blocked by admin";
+  if (r.includes("human reviewer") || r.includes("no approval")) return "Not approved by a human";
+  if (r.includes("invalid token") || r.includes("bearer")) return "Invalid or missing token";
+  if (r.includes("not registered") || r.includes("sign-in failed")) return "Unrecognized identity";
+  if (r.includes("default deny") || r.includes("not found")) return "Tool not in policy";
+  if (r.includes("guardrail unavailable")) return "Safety scan unavailable";
+  return "Other";
 }
 
-function renderEvents(events) {
-  if (!events.length) return;
-  const body = document.getElementById("events");
-  if (lastId === 0) body.innerHTML = "";
-  for (const e of events) {
-    if (e.decision in counts) counts[e.decision]++;
-    const action = e.method === "tools/call" ? e.tool : e.method === "admin" ? (e.tool ? `admin: ${e.tool}` : "admin") : e.method;
-    const tr = document.createElement("tr");
-    if (!first) tr.className = "fresh";
-    tr.innerHTML = `<td class="t">${time(e.ts)}</td><td>${esc(e.agent_name)}</td><td class="action">${esc(action)}</td>
-      <td><span class="pill ${esc(e.decision)}">${esc(e.decision)}</span></td><td>${esc(e.reason)}</td>`;
-    body.prepend(tr);
-    lastId = e.id;
+// ---------- api ----------
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), 2600);
+}
+async function act(path, msg) {
+  try { await api(path, { method: "POST" }); toast(msg); } catch (e) { toast(`Action failed (${e.message})`); }
+  poll();
+}
+const nameOf = id => (S.agents.find(a => a.agent_id === id) || {}).name || id;
+window.revokeAgent = id => act(`/api/agents/${encodeURIComponent(id)}/revoke`, `Revoked ${nameOf(id)}. Its next call will be blocked.`);
+window.restoreAgent = id => act(`/api/agents/${encodeURIComponent(id)}/restore`, `Restored access for ${nameOf(id)}.`);
+window.toggleTool = (id, tool) => act(`/api/agents/${encodeURIComponent(id)}/tools/${encodeURIComponent(tool)}/toggle`, `Updated ${tool} for ${nameOf(id)}.`);
+window.decide = (id, d) => act(`/api/approvals/${id}/${d}`, d === "approve" ? "Approved. The call is running." : "Denied. The agent was told no.");
+
+// ---------- charts ----------
+const tip = document.getElementById("tip");
+function showTip(html, ev) {
+  tip.innerHTML = html; tip.classList.add("on");
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => tip.classList.remove("on");
+
+function niceTicks(max) {
+  if (max <= 0) return [0, 1, 2];
+  const raw = max / 3, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map(m => m * mag).find(s => s >= raw);
+  const ticks = []; for (let v = 0; v <= max + step * 0.001 || ticks.length < 2; v += step) ticks.push(v);
+  if (ticks[ticks.length - 1] < max) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+function topRounded(x, y, w, h, r) {
+  r = Math.min(r, h, w / 2);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+function decisionBuckets() {
+  const now = Math.floor(Date.now() / 60000), n = 30, b = [];
+  for (let i = n - 1; i >= 0; i--) b.push({ m: now - i, allow: 0, deny: 0 });
+  const start = b[0].m;
+  for (const e of S.events) {
+    if (!isCall(e) || (e.decision !== "allow" && e.decision !== "deny")) continue;
+    const i = Math.floor(e.ts / 60) - start;
+    if (i >= 0 && i < n) b[i][e.decision]++;
   }
-  document.getElementById("s-allow").textContent = counts.allow;
-  document.getElementById("s-deny").textContent = counts.deny;
+  return b;
+}
+function drawDecisions(el) {
+  const b = decisionBuckets();
+  const key = JSON.stringify(b) + el.clientWidth;
+  if (el._key === key) return; el._key = key;
+  const W = Math.max(280, el.clientWidth), H = 220, L = 34, R = 6, T = 10, B = 26;
+  const pw = W - L - R, ph = H - T - B, band = pw / b.length, bw = Math.min(24, band * 0.62);
+  const max = Math.max(...b.map(d => d.allow + d.deny)), ticks = niceTicks(max), top = ticks[ticks.length - 1];
+  const y = v => T + ph - (v / top) * ph;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Allowed and denied decisions per minute, last 30 minutes">`;
+  for (const t of ticks) s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`;
+  s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/>`;
+  b.forEach((d, i) => {
+    const x = L + i * band + (band - bw) / 2;
+    const ha = d.allow ? (d.allow / top) * ph : 0, hd = d.deny ? (d.deny / top) * ph : 0;
+    if (ha) s += d.deny ? `<rect x="${x}" y="${y(0) - ha}" width="${bw}" height="${ha}" fill="var(--s-allow)"/>` : `<path d="${topRounded(x, y(0) - ha, bw, ha, 4)}" fill="var(--s-allow)"/>`;
+    if (hd) { const gap = ha ? 2 : 0; s += `<path d="${topRounded(x, y(0) - ha - gap - hd, bw, hd, 4)}" fill="var(--s-deny)"/>`; }
+    if (i % 5 === 4 || i === b.length - 1) {
+      const lab = i === b.length - 1 ? "now" : new Date(d.m * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+      s += `<text x="${L + i * band + band / 2}" y="${H - 8}" text-anchor="middle">${lab}</text>`;
+    }
+    s += `<rect class="hit" data-i="${i}" x="${L + i * band}" y="${T}" width="${band}" height="${ph}" fill="transparent"/>`;
+  });
+  s += `</svg>`;
+  if (max === 0) s += `<div class="empty" style="position:absolute;inset:0;display:grid;place-items:center;padding:0 0 26px 34px">No agent traffic in the last 30 minutes</div>`;
+  el.innerHTML = s;
+  el.onmousemove = ev => {
+    const i = ev.target.dataset && ev.target.dataset.i; if (i === undefined) return hideTip();
+    const d = b[+i], t = new Date(d.m * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    showTip(`<div class="t">${t}</div><div class="r"><i style="background:var(--s-allow)"></i>Allowed<b>${d.allow}</b></div><div class="r"><i style="background:var(--s-deny)"></i>Denied<b>${d.deny}</b></div>`, ev);
+  };
+  el.onmouseleave = hideTip;
 }
 
-async function tick() {
-  try {
-    const r = await fetch(`/api/state?after=${lastId}`);
-    const s = await r.json();
-    if (lastId > 0 && !s.agents.length) { location.reload(); return; }  // state was reset
-    renderApprovals(s.approvals || []);
-    renderAgents(s.agents);
-    renderEvents(s.events);
-    first = false;
-  } catch (e) { /* gateway restarting; try again next tick */ }
+function drawReasons(el) {
+  const counts = {};
+  for (const e of S.events) if (e.decision === "deny") { const c = denyCategory(e.reason); counts[c] = (counts[c] || 0) + 1; }
+  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+  const key = JSON.stringify(rows) + el.clientWidth;
+  if (el._key === key) return; el._key = key;
+  if (!rows.length) { el.innerHTML = `<div class="empty">No denials yet</div>`; el.onmousemove = null; return; }
+  const total = rows.reduce((s, r) => s + r[1], 0), max = rows[0][1];
+  const W = Math.max(260, el.clientWidth), rowH = 34, H = rows.length * rowH, labW = Math.min(170, W * 0.48), valW = 34;
+  const pw = W - labW - valW;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Denied calls by reason">`;
+  rows.forEach(([name, n], i) => {
+    const yc = i * rowH + rowH / 2, w = Math.max(3, (n / max) * pw), x = labW;
+    s += `<text class="lbl" x="0" y="${yc + 4}">${esc(name)}</text>`;
+    s += `<path d="M${x},${yc - 10}H${x + w - Math.min(4, w / 2)}Q${x + w},${yc - 10} ${x + w},${yc - 10 + Math.min(4, w / 2)}V${yc + 10 - Math.min(4, w / 2)}Q${x + w},${yc + 10} ${x + w - Math.min(4, w / 2)},${yc + 10}H${x}Z" fill="var(--s-deny)"/>`;
+    s += `<text class="val" x="${x + w + 8}" y="${yc + 4}">${n}</text>`;
+    s += `<rect class="hit" data-i="${i}" x="0" y="${i * rowH}" width="${W}" height="${rowH}" fill="transparent"/>`;
+  });
+  el.innerHTML = s + `</svg>`;
+  el.onmousemove = ev => {
+    const i = ev.target.dataset && ev.target.dataset.i; if (i === undefined) return hideTip();
+    const [name, n] = rows[+i];
+    showTip(`<div class="t">${esc(name)}</div><div class="r">Denied calls<b>${n}</b></div><div class="r">Share of denials<b>${Math.round((n / total) * 100)}%</b></div>`, ev);
+  };
+  el.onmouseleave = hideTip;
 }
-tick();
-setInterval(tick, 1000);
+
+// ---------- shared fragments ----------
+function feedHTML(events) {
+  if (!events.length) return `<div class="empty">Waiting for agent traffic…</div>`;
+  return `<div class="feed">${events.map(e => `<div class="ev"><span class="t muted num">${fmtTime(e.ts)}</span><span class="agentc">${esc(e.agent_name)}</span><span class="what"><span class="mono">${esc(action(e))}</span> <span class="muted">· ${esc(e.reason)}</span></span>${pill(e.decision)}</div>`).join("")}</div>`;
+}
+function approvalCard(a) {
+  const args = Object.entries(a.arguments || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ");
+  return `<div class="approval">
+    <div class="row"><span class="pill pending">Waiting</span><b>${esc(a.agent_name)}</b><span class="muted">wants to run a high-risk call · ${agoSpan(a.ts)}</span></div>
+    <div class="call">${esc(a.tool)}(${esc(args)})</div>
+    <div class="row"><span class="muted">The agent is paused until you decide. No decision within ${S.policy ? S.policy.approval_timeout : 120}s means no.</span>
+      <button class="btn good" onclick="decide(${a.id},'approve')">Approve</button>
+      <button class="btn danger" onclick="decide(${a.id},'deny')">Deny</button></div>
+  </div>`;
+}
+function identityBadge(a) {
+  return a.identity === "aws-iam"
+    ? `<span class="badge">${ICON.aws}AWS IAM role · no stored secret</span>`
+    : `<span class="badge">${ICON.auth0}Auth0 · machine-to-machine</span>`;
+}
+function setHTML(el, html) { if (el && el._html !== html) { el.innerHTML = html; el._html = html; } }
+
+// ---------- views ----------
+const VIEWS = {
+  overview: {
+    title: "Overview",
+    desc: "Every tool call your AI agents make passes through Lanyard. Here is what they are doing right now.",
+    mount: v => v.innerHTML = `
+      <section class="tiles">
+        <div class="tile"><div class="label"><i style="background:var(--s-allow)"></i>Calls allowed</div><div class="value" id="t-allow">0</div><div class="note">verified identity and permission</div></div>
+        <div class="tile"><div class="label"><i style="background:var(--s-deny)"></i>Calls denied</div><div class="value" id="t-deny">0</div><div class="note" id="t-deny-n">blocked before reaching a tool</div></div>
+        <div class="tile"><div class="label">Awaiting approval</div><div class="value" id="t-pend">0</div><div class="note">high-risk calls paused for a human</div></div>
+        <div class="tile"><div class="label">Agents</div><div class="value" id="t-agents">0</div><div class="note" id="t-agents-n">none seen yet</div></div>
+      </section>
+      <div class="grid2">
+        <div class="panel"><div class="panel-h"><h3>Decisions per minute</h3><span class="sub">last 30 minutes</span><div class="legend right"><span><i style="background:var(--s-allow)"></i>Allowed</span><span><i style="background:var(--s-deny)"></i>Denied</span></div></div><div class="chart" id="c-dec"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Why calls were denied</h3><span class="sub">all denials</span></div><div class="chart" id="c-why"></div></div>
+      </div>
+      <div class="grid2">
+        <div class="panel"><div class="panel-h"><h3>Recent activity</h3><a class="right" href="#/audit">Full audit log →</a></div><div id="o-feed"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Needs your approval</h3></div><div id="o-appr"></div></div>
+      </div>`,
+    update() {
+      const calls = S.events.filter(isCall);
+      document.getElementById("t-allow").textContent = calls.filter(e => e.decision === "allow").length.toLocaleString();
+      document.getElementById("t-deny").textContent = S.events.filter(e => e.decision === "deny").length.toLocaleString();
+      document.getElementById("t-pend").textContent = S.approvals.length;
+      const rev = S.agents.filter(a => a.revoked).length;
+      document.getElementById("t-agents").textContent = S.agents.length;
+      document.getElementById("t-agents-n").textContent = S.agents.length ? (rev ? `${rev} revoked` : "all active") : "none seen yet";
+      drawDecisions(document.getElementById("c-dec"));
+      drawReasons(document.getElementById("c-why"));
+      setHTML(document.getElementById("o-feed"), feedHTML(S.events.filter(e => e.method !== "tools/list").slice(-8).reverse()));
+      setHTML(document.getElementById("o-appr"), S.approvals.length ? `<div style="display:grid;gap:12px">${S.approvals.map(approvalCard).join("")}</div>` : `<div class="empty">Nothing waiting. Production deploys will appear here.</div>`);
+    },
+  },
+
+  agents: {
+    title: "Agents",
+    desc: "Each agent has its own identity. Revoke one and its very next call is blocked, even if its token has not expired.",
+    mount: v => v.innerHTML = `<div id="a-list" style="display:grid;gap:18px"></div>`,
+    update() {
+      const html = S.agents.length ? S.agents.map(a => {
+        const mine = S.events.filter(e => e.agent_id === a.agent_id);
+        const allowed = mine.filter(e => e.decision === "allow" && isCall(e)).length, denied = mine.filter(e => e.decision === "deny").length;
+        const id = esc(JSON.stringify(a.agent_id));
+        const rev = a.revoked;
+        const chips = a.tools.map(t => {
+          const sub = t.status === "no-scope" ? `needs ${t.scope}` : t.status === "blocked" ? "blocked by you" : `via ${t.scope}`;
+          const click = t.status === "no-scope" ? "disabled" : `onclick='toggleTool(${id}, ${esc(JSON.stringify(t.name))})'`;
+          return `<button class="chip ${t.status}" ${click} title="${t.status === "no-scope" ? "Not in this agent's token" : "Click to " + (t.status === "blocked" ? "allow" : "block")}"><span class="dot"></span><span><span class="tn">${esc(t.name)}</span><span class="ts">${esc(sub)}</span></span></button>`;
+        }).join("");
+        return `<article class="panel agent ${rev ? "revoked" : ""}">
+          <div class="agent-h">
+            <div class="avatar">${a.identity === "aws-iam" ? ICON.aws : ICON.auth0}</div>
+            <div class="who"><span class="name">${esc(a.name)}</span>${identityBadge(a)}</div>
+            <div class="actions">
+              ${rev ? `<span class="pill deny">Revoked</span><button class="btn" onclick='restoreAgent(${id})'>Restore access</button>`
+                    : `<span class="pill allow">Active</span><button class="btn danger" onclick='revokeAgent(${id})'>Revoke</button>`}
+            </div>
+          </div>
+          <div class="agent-b">
+            <div>
+              <p class="sec-title">Identity</p>
+              <dl class="kv">
+                <dt>Agent ID</dt><dd class="mono">${esc(a.agent_id)}</dd>
+                <dt>Token scopes</dt><dd><div class="scopes">${(a.scopes || "").split(" ").filter(Boolean).map(s => `<span class="scope">${esc(s)}</span>`).join("") || "none"}</div></dd>
+                <dt>Last seen</dt><dd>${agoSpan(a.last_seen)}</dd>
+                <dt>Calls</dt><dd>${allowed} allowed · ${denied} denied</dd>
+                ${rev ? `<dt>Revoked</dt><dd>${agoSpan(rev.revoked_at)}${rev.grant_scopes ? " · Auth0 grant removed" : ""}</dd>` : ""}
+              </dl>
+            </div>
+            <div>
+              <p class="sec-title">Tool access</p>
+              <div class="chips">${chips}</div>
+              <p class="hint">Green tools are allowed. Click one to block it for this agent only; click again to allow. Grey tools need a permission this agent's token does not have.</p>
+            </div>
+          </div>
+          <div class="agent-f"><p class="sec-title" style="margin:0">Latest activity</p>${feedHTML(mine.filter(e => e.method !== "tools/list").slice(-4).reverse())}</div>
+        </article>`;
+      }).join("") : `<div class="panel empty">No agents yet. They appear here after their first request.</div>`;
+      setHTML(document.getElementById("a-list"), html);
+    },
+  },
+
+  approvals: {
+    title: "Approvals",
+    desc: "High-risk calls, like production deploys, wait here until a person approves them, even when the agent has permission.",
+    mount: v => v.innerHTML = `
+      <div class="panel"><div class="panel-h"><h3>Waiting for you</h3></div><div id="p-now"></div></div>
+      <div class="panel"><div class="panel-h"><h3>Decision history</h3></div><div id="p-hist"></div></div>`,
+    update() {
+      setHTML(document.getElementById("p-now"), S.approvals.length ? `<div style="display:grid;gap:12px">${S.approvals.map(approvalCard).join("")}</div>` : `<div class="empty">Nothing waiting right now.</div>`);
+      const hist = S.events.filter(e => e.decision === "pending" || /approved by human|human reviewer|no approval|awaiting approval|human (approved|denied)/.test(e.reason)).slice(-30).reverse();
+      setHTML(document.getElementById("p-hist"), feedHTML(hist));
+    },
+  },
+
+  audit: {
+    title: "Audit log",
+    desc: "Every decision Lanyard made, with the reason. Click a row for the full details.",
+    mount: v => {
+      v.innerHTML = `<div class="panel">
+        <div class="toolbar">
+          <input id="f-q" type="search" placeholder="Search tool, agent or reason" aria-label="Search">
+          <select id="f-agent" aria-label="Agent"><option value="">All agents</option></select>
+          <select id="f-dec" aria-label="Decision"><option value="">All decisions</option><option value="allow">Allowed</option><option value="deny">Denied</option><option value="pending">Pending</option><option value="admin">Admin</option></select>
+          <button class="btn" id="f-csv" type="button">Download CSV</button>
+        </div>
+        <div class="tablewrap"><table><thead><tr><th>Time</th><th>Agent</th><th>Action</th><th>Decision</th><th>Reason</th><th class="num">ms</th></tr></thead><tbody id="g-body"></tbody></table></div>
+        <p class="hint" id="g-count"></p>
+      </div>`;
+      ["f-q", "f-agent", "f-dec"].forEach(id => document.getElementById(id).addEventListener("input", () => VIEWS.audit.update(true)));
+      document.getElementById("f-csv").onclick = downloadCSV;
+      document.getElementById("g-body").onclick = ev => {
+        const tr = ev.target.closest("tr.ev-row"); if (!tr) return;
+        const id = +tr.dataset.id; expanded.has(id) ? expanded.delete(id) : expanded.add(id); VIEWS.audit.update(true);
+      };
+    },
+    filtered() {
+      const q = document.getElementById("f-q").value.toLowerCase(), ag = document.getElementById("f-agent").value, d = document.getElementById("f-dec").value;
+      return S.events.filter(e => (!ag || e.agent_id === ag) && (!d || e.decision === d) &&
+        (!q || `${e.agent_name} ${action(e)} ${e.reason}`.toLowerCase().includes(q))).slice().reverse();
+    },
+    update(force) {
+      const sel = document.getElementById("f-agent");
+      const opts = `<option value="">All agents</option>` + S.agents.map(a => `<option value="${esc(a.agent_id)}">${esc(a.name)}</option>`).join("");
+      if (sel._opts !== opts) { const cur = sel.value; sel.innerHTML = opts; sel.value = cur; sel._opts = opts; }
+      const rows = this.filtered(), shown = rows.slice(0, 300), body = document.getElementById("g-body");
+      const html = shown.map(e => {
+        const main = `<tr class="ev-row" data-id="${e.id}"><td class="t">${fmtTime(e.ts)}</td><td>${esc(e.agent_name)}</td><td class="mono">${esc(action(e))}</td><td>${pill(e.decision)}</td><td>${esc(e.reason)}</td><td class="num muted">${e.latency_ms || ""}</td></tr>`;
+        if (!expanded.has(e.id)) return main;
+        const detail = Object.assign({ agent_id: e.agent_id, at: new Date(e.ts * 1000).toISOString() }, e.detail || {});
+        return main + `<tr class="detail"><td></td><td colspan="5"><pre class="json">${esc(JSON.stringify(detail, null, 2))}</pre></td></tr>`;
+      }).join("") || `<tr><td colspan="6" class="empty">No matching events</td></tr>`;
+      if (force || body._html !== html) { body.innerHTML = html; body._html = html; }
+      document.getElementById("g-count").textContent = `${rows.length.toLocaleString()} events${rows.length > 300 ? " (showing the latest 300)" : ""}`;
+    },
+  },
+
+  policy: {
+    title: "Policy",
+    desc: "The rules Lanyard enforces on every call. Tools with no rule are denied by default.",
+    mount: v => v.innerHTML = `<div id="pol" style="display:grid;gap:18px"></div>`,
+    update() {
+      const p = S.policy; if (!p) return setHTML(document.getElementById("pol"), `<div class="panel empty">Loading policy…</div>`);
+      const check = (on, title, sub) => `<div class="check"><span class="ic ${on ? "on" : "off"}">${on ? "✓" : "–"}</span><div><b>${title}</b><span>${sub}</span></div></div>`;
+      const rule = r => r ? Object.entries(r).map(([k, v]) => `when ${esc(k)} = ${esc(v)}`).join(", ") : `<span class="muted">no</span>`;
+      setHTML(document.getElementById("pol"), `
+        <div class="grid2 even">
+          <div class="panel"><div class="panel-h"><h3>Identity</h3></div>
+            <dl class="kv">
+              <dt>Enterprise IdP</dt><dd>Auth0 (Okta) · <span class="mono">${esc(p.auth0_domain)}</span></dd>
+              <dt>Agent sign-in</dt><dd>OAuth 2.0 client credentials, RS256 JWT verified against Auth0's public keys</dd>
+              <dt>Workloads</dt><dd>${p.workloads.length ? `AWS IAM roles in account <span class="mono">${esc(p.aws_account)}</span>, ${p.workload_token_minutes}-minute Lanyard tokens` : "not enabled"}</dd>
+              <dt>Revocation key</dt><dd>The agent's identity (client ID or IAM role), not its token</dd>
+            </dl></div>
+          <div class="panel"><div class="panel-h"><h3>Safeguards</h3></div><div class="checks">
+            ${check(true, "Default deny", "Tools without a rule cannot be called")}
+            ${check(true, "Revocation checked on every call", `Shared state in ${esc(p.store)}${p.store === "DynamoDB" ? " with strongly consistent reads" : ""}`)}
+            ${check(p.auth0_cutoff, "Cut off at Auth0 on revoke", p.auth0_cutoff ? "Revoking also removes the agent's Auth0 grant" : "Not configured: revocation applies at the gateway only")}
+            ${check(p.guardrail, "Bedrock Guardrails on tool responses", p.guardrail ? `Blocks prompt injection, masks emails and phones; fails ${esc(p.guardrail_fail)}` : "Not configured")}
+            ${check(true, "Human approval for high-risk calls", `Undecided requests expire after ${p.approval_timeout}s`)}
+          </div></div>
+        </div>
+        <div class="panel"><div class="panel-h"><h3>Tool permissions</h3><span class="sub">which permission each tool needs</span></div>
+          <div class="tablewrap"><table><thead><tr><th>Tool</th><th>Server</th><th>Required permission</th><th>Needs human approval</th></tr></thead><tbody>
+          ${p.tools.map(t => `<tr><td class="mono">${esc(t.name)}</td><td>${esc(t.server || "–")}</td><td><span class="scope">${esc(t.scope)}</span></td><td>${rule(t.approval)}</td></tr>`).join("")}
+          </tbody></table></div></div>
+        ${p.workloads.length ? `<div class="panel"><div class="panel-h"><h3>Workload identities</h3><span class="sub">AWS roles that sign in without a stored secret</span></div>
+          <div class="tablewrap"><table><thead><tr><th>IAM role</th><th>Agent</th><th>Permissions</th></tr></thead><tbody>
+          ${p.workloads.map(w => `<tr><td class="mono">${esc(w.role)}</td><td>${esc(w.name)}</td><td><div class="scopes">${w.scopes.map(s => `<span class="scope">${esc(s)}</span>`).join("")}</div></td></tr>`).join("")}
+          </tbody></table></div></div>` : ""}`);
+    },
+  },
+};
+
+function downloadCSV() {
+  const rows = VIEWS.audit.filtered();
+  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = ["time,agent,agent_id,action,decision,reason,latency_ms,detail"].concat(rows.map(e =>
+    [new Date(e.ts * 1000).toISOString(), e.agent_name, e.agent_id, action(e), e.decision, e.reason, e.latency_ms, JSON.stringify(e.detail || {})].map(q).join(","))).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `lanyard-audit-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ---------- routing + loop ----------
+let route = null;
+function go() {
+  const r = (location.hash.replace("#/", "") || "overview").split("?")[0];
+  route = VIEWS[r] ? r : "overview";
+  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.r === route));
+  document.getElementById("title").textContent = VIEWS[route].title;
+  document.getElementById("desc").textContent = VIEWS[route].desc;
+  document.title = `${VIEWS[route].title} · Lanyard`;
+  hideTip();
+  VIEWS[route].mount(document.getElementById("view"));
+  render();
+}
+function render() {
+  if (!route) return;
+  VIEWS[route].update();
+  const n = S.approvals.length, ap = document.getElementById("n-approvals");
+  ap.hidden = !n; ap.textContent = n;
+  const rv = S.agents.filter(a => a.revoked).length, ar = document.getElementById("n-agents-rev");
+  ar.hidden = !rv; ar.textContent = rv; ar.title = `${rv} revoked`;
+}
+
+async function poll() {
+  try {
+    const s = await api(`/api/state?after=${S.lastId}`);
+    if (S.lastId > 0 && !s.agents.length && !s.events.length && S.agents.length) { S.events = []; S.lastId = 0; return poll(); } // state was reset
+    S.agents = s.agents; S.approvals = s.approvals || [];
+    if (s.events.length) { S.events = S.events.concat(s.events).slice(-3000); S.lastId = s.events[s.events.length - 1].id; }
+    document.getElementById("live").classList.remove("down"); document.getElementById("live-t").textContent = "Live";
+    render();
+  } catch (e) {
+    document.getElementById("live").classList.add("down"); document.getElementById("live-t").textContent = "Reconnecting";
+  }
+}
+async function loadPolicy() {
+  try {
+    S.policy = await api("/api/policy");
+    document.getElementById("f-env").textContent = S.policy.environment;
+    document.getElementById("f-store").textContent = S.policy.store;
+    document.getElementById("f-guard").textContent = S.policy.guardrail ? "On" : "Off";
+    if (route === "policy") render();
+  } catch (e) { /* retried on the next interval */ }
+}
+
+// theme: system -> light -> dark
+const THEMES = ["system", "light", "dark"];
+function applyTheme(t) {
+  if (t === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  document.getElementById("theme-btn").textContent = `Theme: ${t}`;
+  for (const id of ["c-dec", "c-why"]) { const el = document.getElementById(id); if (el) el._key = null; }
+}
+let theme = "system";
+try { theme = localStorage.getItem("lanyard-theme") || "system"; } catch (e) {}
+applyTheme(theme);
+document.getElementById("theme-btn").onclick = () => {
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme);
+  try { localStorage.setItem("lanyard-theme", theme); } catch (e) {}
+};
+
+setInterval(() => document.querySelectorAll(".ago").forEach(s => { s.textContent = ago(+s.dataset.ts); }), 1000);
+addEventListener("hashchange", go);
+addEventListener("resize", () => { if (route === "overview") render(); });
+go(); poll(); loadPolicy();
+setInterval(poll, 1000);
+setInterval(loadPolicy, 30000);
 </script>
 </body>
 </html>
