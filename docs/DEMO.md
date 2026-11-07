@@ -37,7 +37,7 @@ Run:
 ```bash
 uv run python scripts/demo_agent.py trusted --task revoke --delay 1.5
 ```
-Open **Agents**. The agent makes 16 safe calls, about 25 seconds in all, so there's no rush: click **Revoke** on `trusted-agent` whenever you're ready.
+Open **Agents**. The agent makes 16 safe calls, about 25 seconds in all, so there's no rush: click **Revoke badge** on `trusted-agent` whenever you're ready.
 
 > "This agent signed in with Auth0 and is working. I revoke it now." (wait for the red 403) "Its very next call is blocked, in about 10 milliseconds, because Lanyard checks revocation before anything else. Look at the reason in the log: its token is still valid for almost 24 hours. And Lanyard also removed its grant in Auth0, so it can't get a new token either. Two layers."
 
@@ -71,7 +71,7 @@ Open **Attack lab**, click **Run all attacks**.
 
 ## In reserve (only if a judge asks or you have extra time)
 
-- **Sub-agents:** `uv run python scripts/demo_agent.py team --delay 3`, open **Agents**, click **Revoke** on `trusted-agent` (restore it first if it's revoked). "Agents create helper agents, never with more access than themselves. One click on the parent cuts off the whole team."
+- **Sub-agents:** `uv run python scripts/demo_agent.py team --delay 3`, open **Agents**, click **Revoke badge** on `trusted-agent` (restore it first if it's revoked). "Agents create helper agents, never with more access than themselves. One click on the parent cuts off the whole team."
 - **Policies:** open **Policy** and scroll to **Cedar policies**. "These are the actual rules AWS evaluates on every call."
 - **Real off-the-shelf agent:** `scripts/launch_agent.sh intern`, ask "deploy payments-api 2.4.1 to staging". Claude Code explains it has no deploy tool.
 
