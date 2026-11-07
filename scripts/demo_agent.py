@@ -7,6 +7,7 @@ and keeps going until the task ends or Lanyard cuts it off.
 """
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -16,7 +17,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from get_token import get_token  # noqa: E402
 
-GATEWAY = "http://127.0.0.1:8000/mcp"
+GATEWAY = os.environ.get("LANYARD_URL", "http://127.0.0.1:8000").rstrip("/") + "/mcp"
 
 STEPS = [
     ("list_files", {}),

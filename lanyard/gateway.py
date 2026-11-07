@@ -9,10 +9,14 @@ Agents connect to POST /mcp with an Auth0 access token. For each JSON-RPC messag
 """
 
 import asyncio
+import base64
+import json
 import os
+import secrets
 import time
 from pathlib import Path
 
+import boto3
 import httpx
 import jwt
 from dotenv import dotenv_values
@@ -33,14 +37,47 @@ ISSUER = f"https://{DOMAIN}/"
 AGENT_NAMES = {v: k[: -len("_CLIENT_ID")].lower() + "-agent" for k, v in ENV.items()
                if k.endswith("_CLIENT_ID") and v}
 
-store = SQLiteStore(ENV.get("LANYARD_DB", ROOT / "lanyard.db"))
+AWS_PROFILE = ENV.get("AWS_PROFILE") or None
+AWS_REGION = ENV.get("AWS_REGION", "us-east-1")
+
+# State store: SQLite locally, DynamoDB when several gateway instances must share decisions.
+if ENV.get("LANYARD_STORE") == "dynamo":
+    from .dynamo_store import DynamoStore
+    store = DynamoStore(ENV.get("LANYARD_TABLE", "lanyard"), AWS_PROFILE, AWS_REGION)
+else:
+    store = SQLiteStore(ENV.get("LANYARD_DB", ROOT / "lanyard.db"))
+
+# Tool servers: from policy.py, or LANYARD_BACKENDS='{"files": "lambda:fn-name", ...}' in the cloud.
+BACKENDS = json.loads(ENV["LANYARD_BACKENDS"]) if ENV.get("LANYARD_BACKENDS") else BACKENDS
+ADMIN_PASSWORD = ENV.get("LANYARD_ADMIN_PASSWORD")
+
 jwks = jwt.PyJWKClient(f"https://{DOMAIN}/.well-known/jwks.json", cache_keys=True, lifespan=3600)
 http = httpx.AsyncClient(timeout=30)
+_lambda = None
 app = FastAPI(title="Lanyard")
+
+
+@app.middleware("http")
+async def admin_auth(request: Request, call_next):
+    """Dashboard and admin API require a password when LANYARD_ADMIN_PASSWORD is set.
+    The /mcp endpoint is protected separately, by the agent's JWT."""
+    if ADMIN_PASSWORD and not request.url.path.startswith("/mcp"):
+        ok = False
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("basic "):
+            try:
+                _, _, pw = base64.b64decode(auth[6:]).decode().partition(":")
+                ok = secrets.compare_digest(pw, ADMIN_PASSWORD)
+            except ValueError:
+                ok = False
+        if not ok:
+            return Response("Lanyard admin login required", status_code=401,
+                            headers={"WWW-Authenticate": 'Basic realm="Lanyard admin"'})
+    return await call_next(request)
 
 # Optional: scan tool responses with Bedrock Guardrails. Fails closed unless LANYARD_GUARDRAIL_FAIL=open.
 guard = (ToolResponseGuard(ENV["LANYARD_GUARDRAIL_ID"], ENV.get("LANYARD_GUARDRAIL_VERSION", "DRAFT"),
-                           ENV.get("AWS_PROFILE"), ENV.get("AWS_REGION", "us-east-1"))
+                           AWS_PROFILE, AWS_REGION)
          if ENV.get("LANYARD_GUARDRAIL_ID") else None)
 GUARD_FAIL_OPEN = ENV.get("LANYARD_GUARDRAIL_FAIL", "closed") == "open"
 
@@ -69,8 +106,22 @@ async def verify_token(token: str) -> dict:
     return jwt.decode(token, key.key, algorithms=["RS256"], audience=AUDIENCE, issuer=ISSUER)
 
 
+def _invoke_lambda(function: str, body: dict) -> dict:
+    """Tool servers in the cloud are private Lambda functions; only the gateway's role may invoke them."""
+    global _lambda
+    if _lambda is None:
+        _lambda = boto3.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION).client("lambda")
+    r = _lambda.invoke(FunctionName=function, Payload=json.dumps(body).encode())
+    payload = json.loads(r["Payload"].read())
+    if r.get("FunctionError"):
+        raise httpx.HTTPError(f"{function}: {payload.get('errorMessage', payload)}")
+    return payload
+
+
 async def backend_rpc(url: str, method: str, params: dict | None = None) -> dict:
     body = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}
+    if url.startswith("lambda:"):
+        return await asyncio.to_thread(_invoke_lambda, url[len("lambda:"):], body)
     r = await http.post(url, json=body, headers=MCP_HEADERS)
     r.raise_for_status()
     return r.json()
