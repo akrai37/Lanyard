@@ -1,240 +1,292 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lanyard Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* ---------- tokens: dark is the default; light and system are opt-in ---------- */
   :root {
-    color-scheme: light;
-    --page: #f4f4f1; --side: #ecebe6; --surface: #fcfcfb; --raised: #ffffff;
-    --ink: #0b0b0b; --ink-2: #52514e; --muted: #75736d; --grid: #e1e0d9; --axis: #c3c2b7;
-    --line: rgba(11,11,11,.10); --hover: rgba(11,11,11,.04);
-    --accent: #2a78d6; --accent-wash: #e3eefb;
-    --s-allow: #2a78d6; --s-deny: #eb6834;
-    --good: #0ca30c; --good-ink: #006300; --good-wash: #e2f4e2;
-    --crit: #d03b3b; --crit-ink: #b42323; --crit-wash: #fbe5e5;
-    --warn: #fab219; --warn-ink: #8a5a00; --warn-wash: #fdf1d6;
-    --info-ink: #1c5cab; --info-wash: #e3eefb;
-    --shadow: 0 1px 2px rgba(11,11,11,.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      color-scheme: dark;
-      --page: #0d0d0d; --side: #121211; --surface: #1a1a19; --raised: #222220;
-      --ink: #f0efec; --ink-2: #c3c2b7; --muted: #94928b; --grid: #2c2c2a; --axis: #383835;
-      --line: rgba(255,255,255,.10); --hover: rgba(255,255,255,.04);
-      --accent: #3987e5; --accent-wash: #15263d;
-      --s-allow: #3987e5; --s-deny: #d95926;
-      --good: #0ca30c; --good-ink: #3fc23f; --good-wash: #10260f;
-      --crit: #d03b3b; --crit-ink: #f07a7a; --crit-wash: #2d1515;
-      --warn: #fab219; --warn-ink: #f5c45a; --warn-wash: #2e2410;
-      --info-ink: #86b6ef; --info-wash: #15263d;
-      --shadow: none;
-    }
-  }
-  :root[data-theme="dark"] {
     color-scheme: dark;
-    --page: #0d0d0d; --side: #121211; --surface: #1a1a19; --raised: #222220;
-    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #94928b; --grid: #2c2c2a; --axis: #383835;
-    --line: rgba(255,255,255,.10); --hover: rgba(255,255,255,.04);
-    --accent: #3987e5; --accent-wash: #15263d;
+    --page: #0a0f1c; --side: #0d1424; --surface: #131b2e; --raised: #1a2440;
+    --ink: #e9edf7; --ink-2: #b9c1d6; --muted: #8590ab; --line: rgba(255,255,255,.08); --hover: rgba(255,255,255,.04);
+    --grid: #232d47; --axis: #33405f;
+    --brand: #5b8cff; --brand-2: #9bb5ff; --brand-wash: rgba(91,140,255,.14);
     --s-allow: #3987e5; --s-deny: #d95926;
-    --good: #0ca30c; --good-ink: #3fc23f; --good-wash: #10260f;
-    --crit: #d03b3b; --crit-ink: #f07a7a; --crit-wash: #2d1515;
-    --warn: #fab219; --warn-ink: #f5c45a; --warn-wash: #2e2410;
-    --info-ink: #86b6ef; --info-wash: #15263d;
-    --shadow: none;
+    --good: #2fbf71; --good-ink: #5fd896; --good-wash: rgba(47,191,113,.14);
+    --crit: #e5484d; --crit-ink: #ff8a8d; --crit-wash: rgba(229,72,77,.15);
+    --warn: #f5b83d; --warn-ink: #ffcf70; --warn-wash: rgba(245,184,61,.14);
+    --info-ink: #a9beff; --info-wash: rgba(91,140,255,.15);
+    --badge: #f3f0e7; --badge-ink: #151a2b; --badge-muted: #6c7080; --badge-line: rgba(21,26,43,.12);
+    --badge-shadow: 0 18px 40px -18px rgba(0,0,0,.7), 0 2px 0 rgba(255,255,255,.04) inset;
+    --id-auth0: #5b8cff; --id-aws: #19b39b; --id-sub: #a78bfa; --id-red: #e5484d;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --page: #eef0f5; --side: #e3e6ee; --surface: #fbfaf6; --raised: #ffffff;
+    --ink: #12172a; --ink-2: #3d4459; --muted: #666c80; --line: rgba(18,23,42,.1); --hover: rgba(18,23,42,.04);
+    --grid: #e2e4ea; --axis: #c3c8d4;
+    --brand: #3a6df0; --brand-2: #7fa0f5; --brand-wash: #e1e9fd;
+    --s-allow: #2a78d6; --s-deny: #eb6834;
+    --good: #16a34a; --good-ink: #15803d; --good-wash: #dcfce7;
+    --crit: #dc2626; --crit-ink: #b91c1c; --crit-wash: #fee2e2;
+    --warn: #d97706; --warn-ink: #92400e; --warn-wash: #fef3c7;
+    --info-ink: #1d4ed8; --info-wash: #dbeafe;
+    --badge: #ffffff; --badge-shadow: 0 16px 34px -16px rgba(18,23,42,.35), 0 0 0 1px rgba(18,23,42,.06);
+  }
+  @media (prefers-color-scheme: light) {
+    :root[data-theme="system"] {
+      color-scheme: light;
+      --page: #eef0f5; --side: #e3e6ee; --surface: #fbfaf6; --raised: #ffffff;
+      --ink: #12172a; --ink-2: #3d4459; --muted: #666c80; --line: rgba(18,23,42,.1); --hover: rgba(18,23,42,.04);
+      --grid: #e2e4ea; --axis: #c3c8d4;
+      --brand: #3a6df0; --brand-2: #7fa0f5; --brand-wash: #e1e9fd;
+      --s-allow: #2a78d6; --s-deny: #eb6834;
+      --good: #16a34a; --good-ink: #15803d; --good-wash: #dcfce7;
+      --crit: #dc2626; --crit-ink: #b91c1c; --crit-wash: #fee2e2;
+      --warn: #d97706; --warn-ink: #92400e; --warn-wash: #fef3c7;
+      --info-ink: #1d4ed8; --info-wash: #dbeafe;
+      --badge: #ffffff; --badge-shadow: 0 16px 34px -16px rgba(18,23,42,.35), 0 0 0 1px rgba(18,23,42,.06);
+    }
   }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; }
-  body { background: var(--page); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { background: var(--page); color: var(--ink); font: 14px/1.5 "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif; }
   button, input, select { font: inherit; color: inherit; }
-  a { color: var(--accent); }
-  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  a { color: var(--brand-2); }
+  .mono, code, pre { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+  .mono { font-size: 12.5px; }
   .muted { color: var(--muted); }
   .num { font-variant-numeric: tabular-nums; }
+  .eyebrow { font: 600 11px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 
-  /* layout */
-  .app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
-  .side { background: var(--side); border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
-  .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 18px; }
-  .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); display: grid; place-items: center; }
-  .brand b { font-size: 16px; letter-spacing: .2px; display: block; line-height: 1.1; }
-  .brand span { font-size: 12px; color: var(--muted); }
-  .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ink-2); text-decoration: none; font-weight: 500; }
+  /* ---------- frame ---------- */
+  .app { display: grid; grid-template-columns: 236px 1fr; min-height: 100vh; }
+  .side { background: var(--side); position: sticky; top: 0; height: 100vh; padding: 22px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .side::after { /* the lanyard strap */
+    content: ""; position: absolute; top: 0; right: 0; width: 5px; height: 100%;
+    background: repeating-linear-gradient(180deg, var(--brand) 0 14px, var(--brand-2) 14px 18px, var(--brand) 18px 32px);
+    opacity: .9;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 8px 22px; }
+  .brand-mark { width: 34px; height: 42px; border-radius: 7px; background: var(--badge); position: relative; display: grid; place-items: end center; padding-bottom: 7px; box-shadow: var(--badge-shadow); }
+  .brand-mark::before { content: ""; position: absolute; top: 5px; left: 50%; width: 12px; height: 3px; border-radius: 2px; background: var(--badge-muted); transform: translateX(-50%); opacity: .5; }
+  .brand-mark i { width: 18px; height: 14px; border-radius: 3px; background: var(--brand); display: block; }
+  .brand b { font-size: 18px; letter-spacing: -.01em; display: block; line-height: 1.1; }
+  .brand span { font-size: 11.5px; color: var(--muted); }
+  .nav { display: grid; gap: 2px; }
+  .nav a { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 9px; color: var(--ink-2); text-decoration: none; font-weight: 500; }
   .nav a:hover { background: var(--hover); color: var(--ink); }
-  .nav a.on { background: var(--raised); color: var(--ink); box-shadow: var(--shadow); outline: 1px solid var(--line); }
+  .nav a.on { background: var(--brand-wash); color: var(--ink); box-shadow: inset 3px 0 0 var(--brand); }
   .nav svg { width: 17px; height: 17px; flex: none; }
-  .nav .count { margin-left: auto; font-size: 11.5px; font-weight: 700; min-width: 20px; text-align: center; padding: 1px 6px; border-radius: 999px; background: var(--warn); color: #0b0b0b; }
-  .side-foot { margin-top: auto; border-top: 1px solid var(--line); padding: 14px 8px 0; display: grid; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .nav .count { margin-left: auto; font: 700 11px/1.6 "JetBrains Mono", monospace; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 999px; background: var(--warn); color: #111; }
+  .nav .count.red { background: var(--crit); color: #fff; }
+  .side-foot { margin-top: auto; border-top: 1px solid var(--line); padding: 14px 8px 0; display: grid; gap: 7px; font-size: 12.5px; color: var(--ink-2); }
   .side-foot .row { display: flex; justify-content: space-between; gap: 8px; }
   .side-foot .row span:first-child { color: var(--muted); }
-  .theme-btn { margin-top: 4px; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--ink-2); text-align: left; }
-  .theme-btn:hover { background: var(--hover); }
+  .side-foot .links { display: flex; gap: 12px; margin-top: 6px; }
+  .side-foot button, .side-foot a { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; font-size: 12.5px; text-decoration: none; }
+  .side-foot button:hover, .side-foot a:hover { color: var(--ink); }
 
   main { min-width: 0; }
-  .top { display: flex; align-items: center; gap: 12px; padding: 22px 32px 6px; }
-  .top h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -.2px; }
-  .desc { color: var(--muted); margin: 0 32px 18px; max-width: 760px; }
-  .live { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--surface); }
-  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: beat 2s infinite; }
+  .top { padding: 26px 34px 6px; display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .top .titles { display: grid; gap: 8px; }
+  .top h1 { font-size: 30px; margin: 0; font-weight: 700; letter-spacing: -.02em; line-height: 1.05; }
+  .live { margin-left: auto; display: inline-flex; align-items: center; gap: 9px; font: 500 12px/1 "JetBrains Mono", monospace; color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; background: var(--surface); }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: beat 2s infinite; }
   .live.down i { background: var(--crit); animation: none; }
-  @keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(12,163,12,.5); } 70% { box-shadow: 0 0 0 7px rgba(12,163,12,0); } 100% { box-shadow: 0 0 0 0 rgba(12,163,12,0); } }
-  #view { padding: 0 32px 40px; display: grid; gap: 18px; }
+  @keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(47,191,113,.55); } 70% { box-shadow: 0 0 0 8px rgba(47,191,113,0); } 100% { box-shadow: 0 0 0 0 rgba(47,191,113,0); } }
+  .desc { color: var(--muted); margin: 6px 34px 22px; max-width: 780px; }
+  #view { padding: 0 34px 48px; display: grid; gap: 20px; }
 
-  /* panels */
-  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
-  .panel-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-  .panel-h h3 { font-size: 14.5px; margin: 0; font-weight: 600; }
+  /* ---------- panels ---------- */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; min-width: 0; }
+  .panel-h { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .panel-h h3 { font-size: 15.5px; margin: 0; font-weight: 600; letter-spacing: -.005em; }
   .panel-h .sub { color: var(--muted); font-size: 12.5px; }
   .panel-h .right { margin-left: auto; }
-  .grid2 { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; }
   .grid2.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .empty { color: var(--muted); padding: 26px 4px; text-align: center; }
 
-  /* stat tiles */
-  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
-  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
-  .tile .label { color: var(--ink-2); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  /* ---------- stat tiles: printed like turnstile counters ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden; }
+  .tile .label { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-weight: 500; }
   .tile .label i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-  .tile .value { font-size: 30px; font-weight: 650; line-height: 1.15; margin-top: 6px; }
-  .tile .note { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .tile .value { font-size: 40px; font-weight: 700; line-height: 1; margin: 12px 0 6px; letter-spacing: -.03em; }
+  .tile .note { color: var(--muted); font-size: 12.5px; }
+  .tile::after { content: ""; position: absolute; right: -18px; top: -18px; width: 64px; height: 64px; border-radius: 50%; border: 10px solid var(--hover); }
 
-  /* legend + charts */
+  /* ---------- charts ---------- */
   .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink-2); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
   .chart { position: relative; width: 100%; }
   .chart svg { display: block; width: 100%; overflow: visible; }
-  .chart text { fill: var(--muted); font-size: 11px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-  .chart .lbl { fill: var(--ink-2); font-size: 12.5px; }
-  .chart .val { fill: var(--ink); font-size: 12.5px; font-weight: 600; }
-  .empty { color: var(--muted); padding: 26px 4px; text-align: center; }
-  .tip { position: fixed; pointer-events: none; z-index: 50; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 6px 20px rgba(0,0,0,.18); opacity: 0; transition: opacity .1s; min-width: 120px; }
+  .chart text { fill: var(--muted); font: 11px "JetBrains Mono", monospace; }
+  .chart .lbl { fill: var(--ink-2); font: 500 12.5px "Space Grotesk", sans-serif; }
+  .chart .val { fill: var(--ink); font: 600 12.5px "JetBrains Mono", monospace; }
+  .tip { position: fixed; pointer-events: none; z-index: 50; background: var(--raised); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; font-size: 12.5px; box-shadow: 0 10px 30px rgba(0,0,0,.3); opacity: 0; transition: opacity .1s; min-width: 130px; }
   .tip.on { opacity: 1; }
-  .tip .t { color: var(--muted); margin-bottom: 4px; }
+  .tip .t { color: var(--muted); margin-bottom: 4px; font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
   .tip .r { display: flex; align-items: center; gap: 6px; }
-  .tip .r b { margin-left: auto; padding-left: 14px; }
+  .tip .r b { margin-left: auto; padding-left: 14px; font-family: "JetBrains Mono", monospace; }
   .tip i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
 
-  /* pills, badges, buttons */
-  .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 650; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  /* ---------- decision pills: access-control vocabulary ---------- */
+  .pill { display: inline-flex; align-items: center; gap: 5px; font: 700 10.5px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; padding: 5px 8px; border-radius: 6px; white-space: nowrap; }
   .pill.allow { color: var(--good-ink); background: var(--good-wash); }
   .pill.deny, .pill.error { color: var(--crit-ink); background: var(--crit-wash); }
   .pill.pending { color: var(--warn-ink); background: var(--warn-wash); }
   .pill.admin { color: var(--info-ink); background: var(--info-wash); }
-  .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--ink-2); background: var(--raised); white-space: nowrap; }
-  .badge svg { width: 13px; height: 13px; }
-  .btn { border: 1px solid var(--line); background: var(--raised); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-weight: 550; white-space: nowrap; }
-  .btn:hover { background: var(--hover); }
+  .btn { border: 1px solid var(--line); background: var(--raised); border-radius: 9px; padding: 8px 14px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+  .btn:hover { border-color: var(--axis); }
   .btn.danger { background: var(--crit); border-color: var(--crit); color: #fff; }
-  .btn.danger:hover { filter: brightness(1.08); }
   .btn.good { background: var(--good); border-color: var(--good); color: #fff; }
-  .btn.good:hover { filter: brightness(1.08); }
-  .btn:focus-visible, .chip:focus-visible, .nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn.danger:hover, .btn.good:hover { filter: brightness(1.08); }
+  .btn:disabled { opacity: .6; cursor: progress; }
+  .btn:focus-visible, .door:focus-visible, .nav a:focus-visible { outline: 2px solid var(--brand-2); outline-offset: 2px; }
 
-  /* agents */
-  .agent { padding: 0; overflow: hidden; }
-  .agent.revoked { border-color: var(--crit); }
-  .agent-h { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  .avatar { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-wash); color: var(--accent); flex: none; }
-  .avatar svg { width: 20px; height: 20px; }
-  .agent-h .name { font-weight: 650; font-size: 15.5px; }
-  .agent-h .who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-  .agent-h .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
-  .agent-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 0; }
-  .agent-b > div { padding: 16px 20px; min-width: 0; }
-  .agent-b > div + div { border-left: 1px solid var(--line); }
-  dl.kv { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; margin: 0; font-size: 13px; }
-  dl.kv dt { color: var(--muted); }
-  dl.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-  .scopes { display: flex; flex-wrap: wrap; gap: 6px; }
-  .scope { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; padding: 1px 7px; border-radius: 6px; background: var(--hover); border: 1px solid var(--line); }
-  .sec-title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
-  .chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-  .chip { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--raised); text-align: left; cursor: pointer; }
-  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-  .chip .tn { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
-  .chip .ts { font-size: 11px; color: var(--muted); display: block; }
-  .chip.allowed .dot { background: var(--good); }
-  .chip.blocked { background: var(--crit-wash); border-color: transparent; }
-  .chip.blocked .dot { background: var(--crit); }
-  .chip.blocked .tn { text-decoration: line-through; }
-  .chip.no-scope { cursor: not-allowed; opacity: .55; }
-  .chip.no-scope .dot { background: var(--axis); }
-  .chip:not(.no-scope):hover { border-color: var(--axis); }
-  .hint { color: var(--muted); font-size: 12.5px; margin-top: 10px; }
-  .agent-f { border-top: 1px solid var(--line); padding: 12px 20px; display: grid; gap: 6px; }
-
-  /* approvals */
-  .approval { border: 1px solid var(--warn); background: var(--warn-wash); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; animation: glow 1.6s ease-in-out infinite; }
-  @keyframes glow { 50% { box-shadow: 0 0 0 4px var(--warn-wash); } }
-  .approval .call { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; }
-  .approval .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .approval .row .btn:first-of-type { margin-left: auto; }
-
-  /* feed + tables */
+  /* ---------- access log rows ---------- */
   .feed { display: grid; }
-  .feed .ev { display: grid; grid-template-columns: 62px minmax(0, 120px) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .feed .ev { display: grid; grid-template-columns: 66px minmax(0, 132px) minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px dashed var(--line); font-size: 13px; }
   .feed .ev:first-child { border-top: 0; }
-  .feed .ev .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed .ev .t { font: 12px "JetBrains Mono", monospace; color: var(--muted); }
+  .feed .ev .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feed .ev .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .feed .ev .what b { font: 500 12.5px "JetBrains Mono", monospace; color: var(--ink); }
+
+  /* ---------- the badge ---------- */
+  .families { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 30px 24px; align-items: start; }
+  .family { display: grid; gap: 18px; }
+  .kids { display: grid; gap: 18px; margin-left: 26px; padding-left: 18px; border-left: 2px dashed var(--line); }
+  .holder { display: grid; gap: 10px; }
+  .badge { position: relative; padding-top: 30px; }
+  .badge .strap { position: absolute; top: 0; left: 50%; width: 46px; height: 34px; transform: translateX(-50%);
+    background: linear-gradient(90deg, transparent 0 8px, var(--strap, var(--brand)) 8px 38px, transparent 38px),
+                repeating-linear-gradient(180deg, transparent 0 6px, rgba(255,255,255,.18) 6px 8px);
+    clip-path: polygon(8px 0, 38px 0, 34px 100%, 12px 100%); }
+  .badge .clip { position: absolute; top: 22px; left: 50%; width: 30px; height: 16px; transform: translateX(-50%); border-radius: 5px; background: linear-gradient(180deg, #d9dce4, #9aa0ae); box-shadow: 0 2px 4px rgba(0,0,0,.35); z-index: 2; }
+  .badge .clip::after { content: ""; position: absolute; left: 50%; top: 5px; width: 12px; height: 4px; border-radius: 2px; background: #6b7180; transform: translateX(-50%); }
+  .card { position: relative; background: var(--badge); color: var(--badge-ink); border-radius: 16px; box-shadow: var(--badge-shadow); overflow: hidden; }
+  .card-inner { transition: filter .3s, opacity .3s; }
+  .card .slot { position: absolute; top: 12px; left: 50%; width: 42px; height: 7px; border-radius: 4px; background: var(--page); opacity: .9; transform: translateX(-50%); box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
+  .card .band { margin-top: 26px; padding: 9px 18px; background: var(--idc); color: #fff; display: flex; align-items: center; justify-content: space-between; font: 600 10.5px/1 "JetBrains Mono", monospace; letter-spacing: .16em; text-transform: uppercase; }
+  .card .band span:last-child { opacity: .85; }
+  .card .body { display: grid; grid-template-columns: 74px 1fr; gap: 14px; padding: 16px 18px 6px; align-items: center; }
+  .card .photo { width: 74px; height: 86px; border-radius: 10px; background: linear-gradient(160deg, color-mix(in srgb, var(--idc) 22%, var(--badge)), color-mix(in srgb, var(--idc) 40%, var(--badge))); display: grid; place-items: center; font: 700 26px/1 "Space Grotesk", sans-serif; color: color-mix(in srgb, var(--idc) 70%, #000); position: relative; }
+  .card .photo svg { position: absolute; right: 6px; bottom: 6px; width: 16px; height: 16px; opacity: .55; }
+  .card .nm { font-size: 18px; font-weight: 700; letter-spacing: -.01em; line-height: 1.15; overflow-wrap: anywhere; }
+  .card .kind { color: var(--badge-muted); font-size: 12.5px; margin-top: 3px; }
+  .card .no { margin-top: 8px; font: 600 11.5px/1 "JetBrains Mono", monospace; letter-spacing: .08em; color: var(--badge-muted); }
+  .card .sec { padding: 12px 18px 4px; }
+  .card .sec-t { font: 600 10px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--badge-muted); margin-bottom: 8px; }
+  .doors { display: flex; flex-wrap: wrap; gap: 6px; }
+  .door { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px 6px 7px; border-radius: 7px; border: 1px solid var(--badge-line); background: transparent; color: var(--badge-ink); font: 500 11.5px/1 "JetBrains Mono", monospace; cursor: pointer; }
+  .door i { width: 8px; height: 8px; border-radius: 2px; background: var(--good); }
+  .door.blocked { background: rgba(229,72,77,.1); border-color: rgba(229,72,77,.35); text-decoration: line-through; }
+  .door.blocked i { background: var(--crit); }
+  .door.no-scope { color: var(--badge-muted); border-style: dashed; cursor: not-allowed; opacity: .7; }
+  .door.no-scope i { background: transparent; border: 1px solid var(--badge-muted); }
+  .door:not(.no-scope):hover { border-color: var(--badge-ink); }
+  .card .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 18px; margin-top: 8px; border-top: 1px dashed var(--badge-line); }
+  .card .facts b { display: block; font: 700 15px/1.1 "Space Grotesk", sans-serif; }
+  .card .facts span { font-size: 11px; color: var(--badge-muted); }
+  .card .foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 18px 14px; }
+  .card .foot .id { font: 10.5px/1.3 "JetBrains Mono", monospace; color: var(--badge-muted); overflow-wrap: anywhere; max-width: 55%; }
+  .card .barcode { height: 28px; flex: none; }
+  .card .barcode rect { fill: var(--badge-ink); }
+  .hazard { position: absolute; left: 0; right: 0; top: 0; z-index: 3; height: 26px; padding: 4px 10px; display: flex; align-items: center; justify-content: center;
+    background: repeating-linear-gradient(-45deg, #f5b83d 0 12px, #1a1a1a 12px 16px); }
+  .hazard span { background: #f5b83d; color: #111; padding: 2px 7px; border-radius: 3px; font: 700 10px/1.3 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase;
+    max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge.tainted .card .slot { top: 34px; }
+  .badge.tainted .card .band { margin-top: 50px; }
+  .stamp { position: absolute; z-index: 4; left: 50%; top: 52%; transform: translate(-50%, -50%) rotate(-14deg); border: 4px solid var(--crit); color: var(--crit); padding: 6px 16px; border-radius: 10px;
+    font: 700 28px/1 "Space Grotesk", sans-serif; letter-spacing: .14em; text-transform: uppercase; background: rgba(255,255,255,.55); box-shadow: 0 0 0 3px rgba(255,255,255,.4) inset; white-space: nowrap; pointer-events: none; }
+  .stamp small { display: block; font: 600 10px/1.3 "JetBrains Mono", monospace; letter-spacing: .08em; text-align: center; margin-top: 4px; }
+  .badge.void .card-inner { filter: grayscale(1); opacity: .55; }
+  .badge.void .strap { --strap: #6b7180; }
+  .holder .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .holder .actions .note { color: var(--muted); font-size: 12.5px; }
+  .holder .swipes { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 6px 14px; }
+  .holder .swipes .ev { grid-template-columns: 58px minmax(0, 1fr) auto; }
+  .holder .swipes .ev .who { display: none; }
+
+  /* ---------- security desk (approvals) ---------- */
+  .desk { display: grid; gap: 14px; }
+  .request { position: relative; border-radius: 14px; background: var(--surface); border: 1px solid var(--warn); padding: 16px 18px 16px 24px; display: grid; gap: 10px; animation: glow 1.6s ease-in-out infinite; overflow: hidden; }
+  .request::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: repeating-linear-gradient(-45deg, #f5b83d 0 8px, #1a1a1a 8px 12px); }
+  @keyframes glow { 50% { box-shadow: 0 0 0 5px var(--warn-wash); } }
+  .request .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .request .row .btn:first-of-type { margin-left: auto; }
+  .request .call { font: 500 13px/1.45 "JetBrains Mono", monospace; background: var(--page); border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px; overflow-wrap: anywhere; }
+
+  /* ---------- tables, forms ---------- */
   .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
-  .toolbar input, .toolbar select { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+  .toolbar input, .toolbar select { background: var(--page); border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; }
   .toolbar input { flex: 1; min-width: 200px; }
   .tablewrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--muted); font-weight: 550; font-size: 12px; padding: 0 10px 8px; white-space: nowrap; }
-  td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  th { text-align: left; font: 600 10.5px/1 "JetBrains Mono", monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0 10px 10px; white-space: nowrap; }
+  td { padding: 10px; border-top: 1px dashed var(--line); vertical-align: top; }
   tbody tr.ev-row { cursor: pointer; }
   tbody tr.ev-row:hover td { background: var(--hover); }
-  tr.fresh td { animation: fresh 1.8s ease-out; }
-  @keyframes fresh { from { background: var(--accent-wash); } to { background: transparent; } }
-  td.t { white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+  td.t { white-space: nowrap; color: var(--muted); font: 12px "JetBrains Mono", monospace; }
   tr.detail td { background: var(--hover); }
-  pre.json { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2); }
-  .checks { display: grid; gap: 10px; }
-  .check { display: flex; gap: 10px; align-items: flex-start; }
-  .check .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; }
+  pre.json { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: var(--ink-2); }
+  dl.kv { display: grid; grid-template-columns: 120px 1fr; gap: 9px 14px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .scopes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .scope { font: 500 11.5px/1 "JetBrains Mono", monospace; padding: 5px 7px; border-radius: 6px; background: var(--hover); border: 1px solid var(--line); }
+  .checks { display: grid; gap: 12px; }
+  .check { display: flex; gap: 11px; align-items: flex-start; }
+  .check .ic { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; }
   .check .ic.on { background: var(--good-wash); color: var(--good-ink); }
   .check .ic.off { background: var(--hover); color: var(--muted); }
   .check b { display: block; font-weight: 600; }
   .check span { color: var(--muted); font-size: 12.5px; }
+  .cedar { display: grid; gap: 14px; }
+  .cedar pre { background: var(--page); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; margin: 6px 0 0; font-size: 12px; color: var(--ink-2); white-space: pre-wrap; }
 
+  /* ---------- attack lab ---------- */
   .attacks { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .attack { display: grid; gap: 10px; align-content: start; }
-  .attack h3 { margin: 0; font-size: 14.5px; }
-  .attack .goal { font-size: 13px; color: var(--ink-2); }
-  .attack .goal b, .attack .def b { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; display: block; margin-bottom: 2px; }
-  .attack .def { font-size: 13px; color: var(--ink-2); }
-  .attack .res { border-radius: 8px; padding: 9px 11px; font-size: 12.5px; overflow-wrap: anywhere; }
-  .attack .res.ok { background: var(--good-wash); }
-  .attack .res.bad { background: var(--crit-wash); }
-  .attack .res.skip { background: var(--hover); }
-  .attack .res .mono { font-size: 12px; color: var(--ink-2); display: block; margin-top: 4px; }
-  .attack .row { display: flex; align-items: center; gap: 10px; margin-top: auto; }
-  .toast { position: fixed; right: 20px; bottom: 20px; z-index: 60; background: var(--ink); color: var(--page); padding: 10px 14px; border-radius: 10px; font-size: 13px; opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; }
+  .attack { position: relative; display: grid; gap: 10px; align-content: start; background: var(--page); border: 1px solid var(--line); border-radius: 14px; padding: 18px; overflow: hidden; }
+  .attack h3 { margin: 0; font-size: 15px; }
+  .attack .k { font: 600 10px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+  .attack p { margin: 0; font-size: 13px; color: var(--ink-2); }
+  .attack .res { font: 12px/1.45 "JetBrains Mono", monospace; color: var(--ink-2); overflow-wrap: anywhere; border-radius: 9px; padding: 9px 11px; background: var(--hover); }
+  .attack .verdict { position: absolute; right: 14px; top: 14px; transform: rotate(8deg); border: 3px solid currentColor; border-radius: 8px; padding: 3px 9px; font: 700 13px/1 "Space Grotesk", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+  .attack .verdict.ok { color: var(--good-ink); }
+  .attack .verdict.bad { color: var(--crit-ink); }
+  .attack .verdict.skip { color: var(--muted); }
+  .attack .row { margin-top: auto; }
+
+  .toast { position: fixed; right: 22px; bottom: 22px; z-index: 60; background: var(--ink); color: var(--page); padding: 11px 15px; border-radius: 11px; font-size: 13px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; }
   .toast.on { opacity: 1; transform: none; }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1150px) {
     .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid2, .grid2.even { grid-template-columns: minmax(0, 1fr); }
-    .agent-b { grid-template-columns: minmax(0, 1fr); }
-    .agent-b > div + div { border-left: 0; border-top: 1px solid var(--line); }
   }
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; }
-    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; gap: 6px; }
-    .brand { padding: 0 8px 0 0; }
-    .brand span, .side-foot { display: none; }
-    .nav { display: flex; flex-wrap: wrap; gap: 4px; }
-    .nav a { padding: 6px 9px; }
-    .top { padding: 18px 16px 4px; }
-    .desc { margin: 0 16px 14px; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px 16px; }
+    .side::after { width: 100%; height: 4px; top: auto; bottom: 0; background: repeating-linear-gradient(90deg, var(--brand) 0 14px, var(--brand-2) 14px 18px); }
+    .brand { padding: 0 8px 0 0; } .brand span, .side-foot { display: none; }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px; } .nav a { padding: 6px 9px; }
+    .top { padding: 18px 16px 4px; } .top h1 { font-size: 24px; } .desc { margin: 4px 16px 16px; }
     #view { padding: 0 16px 32px; }
-    .tiles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-    .feed .ev { grid-template-columns: 56px minmax(0, 1fr) auto; }
-    .feed .ev .agentc { display: none; }
+    .tiles { gap: 12px; } .tile .value { font-size: 30px; }
+    .families { grid-template-columns: minmax(0, 1fr); }
+    .kids { margin-left: 10px; padding-left: 12px; }
+    .feed .ev { grid-template-columns: 58px minmax(0, 1fr) auto; } .feed .ev .who { display: none; }
   }
 </style>
 </head>
@@ -242,29 +294,29 @@
 <div class="app">
   <aside class="side">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l4 6 4-6"/><rect x="5" y="8" width="14" height="14" rx="2.5"/><circle cx="12" cy="13.5" r="2"/><path d="M9 18.5h6"/></svg>
-      </div>
-      <div><b>Lanyard</b><span>Agent identity console</span></div>
+      <div class="brand-mark" aria-hidden="true"><i></i></div>
+      <div><b>Lanyard</b><span>Agent identity &amp; access</span></div>
     </div>
     <nav class="nav" id="nav">
       <a href="#/overview" data-r="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
-      <a href="#/agents" data-r="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="2.5"/><path d="M12 7V3M8.5 12h.01M15.5 12h.01M9 16h6"/></svg>Agents<span class="count" id="n-agents-rev" hidden></span></a>
+      <a href="#/agents" data-r="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 4 3-4"/><rect x="5" y="6" width="14" height="16" rx="2.5"/><circle cx="12" cy="12" r="2.5"/><path d="M8.5 18h7"/></svg>Agents<span class="count red" id="n-agents-rev" hidden></span></a>
       <a href="#/approvals" data-r="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Approvals<span class="count" id="n-approvals" hidden></span></a>
-      <a href="#/audit" data-r="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Audit log</a>
+      <a href="#/audit" data-r="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Access log</a>
       <a href="#/attacks" data-r="attacks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Attack lab</a>
       <a href="#/policy" data-r="policy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Policy</a>
     </nav>
-    <div class="side-foot" id="side-foot">
+    <div class="side-foot">
       <div class="row"><span>Runs on</span><span id="f-env">…</span></div>
-      <div class="row"><span>State store</span><span id="f-store">…</span></div>
-      <div class="row"><span>Guardrails</span><span id="f-guard">…</span></div>
-      <button class="theme-btn" id="theme-btn" type="button">Theme: system</button>
-      <a href="/logout" style="font-size:12.5px;color:var(--muted)">Sign out</a>
+      <div class="row"><span>Policy engine</span><span id="f-engine">…</span></div>
+      <div class="row"><span>State</span><span id="f-store">…</span></div>
+      <div class="links"><button id="theme-btn" type="button">Theme: dark</button><a href="/logout">Sign out</a></div>
     </div>
   </aside>
   <main>
-    <div class="top"><h1 id="title">Overview</h1><span class="live" id="live"><i></i><span id="live-t">Live</span></span></div>
+    <div class="top">
+      <div class="titles"><span class="eyebrow">Pinecrest Payments · agent access control</span><h1 id="title">Overview</h1></div>
+      <span class="live" id="live"><i></i><span id="live-t">LIVE</span></span>
+    </div>
     <p class="desc" id="desc"></p>
     <div id="view"></div>
   </main>
@@ -274,45 +326,66 @@
 
 <script>
 // ---------- state ----------
-const S = { agents: [], approvals: [], events: [], policy: null, lastId: 0, loaded: false };
+const S = { agents: [], approvals: [], events: [], policy: null, lastId: 0 };
 const expanded = new Set();
 const ICON = {
   auth0: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>',
   sub: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5V13a5 5 0 0 0 5 5h4.5"/></svg>',
   aws: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z"/></svg>',
+  red: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg>',
 };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtTime = ts => new Date(ts * 1000).toLocaleTimeString([], { hour12: false });
 const ago = ts => { const s = Math.max(0, Math.round(Date.now() / 1000 - ts)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.floor(s / 60)}m ago` : `${Math.floor(s / 3600)}h ago`; };
 const agoSpan = ts => `<span class="ago" data-ts="${ts}">${ago(ts)}</span>`;
-const DECISION_LABEL = { allow: "Allowed", deny: "Denied", pending: "Pending", admin: "Admin", error: "Error" };
+const DECISION_LABEL = { allow: "Granted", deny: "Denied", pending: "Held", admin: "Admin", error: "Error" };
 const pill = d => `<span class="pill ${esc(d)}">${esc(DECISION_LABEL[d] || d)}</span>`;
-const isCall = e => e.method === "tools/call" || e.method === "auth/aws" || e.method === "auth/delegate" || e.method === "tools/list" || e.method === "initialize";
+const isCall = e => ["tools/call", "auth/aws", "auth/delegate", "tools/list", "initialize"].includes(e.method);
 
 function action(e) {
   if (e.method === "tools/call") return e.tool;
   if (e.method === "admin") return e.tool ? `admin · ${e.tool}` : "admin";
   if (e.method === "auth/aws") return "sign-in (AWS IAM)";
-  if (e.method === "auth/delegate") return "create sub-agent";
+  if (e.method === "auth/delegate") return "issue sub-agent badge";
   if (e.method === "attack") return `attack lab · ${e.tool}`;
   if (e.method === "initialize") return "session start";
   return e.method;
 }
-
 function denyCategory(reason) {
   const r = (reason || "").toLowerCase();
   if (r.includes("requires scope")) return "Missing permission";
   if (r.includes("cascade")) return "Parent agent revoked";
-  if (r.includes("privilege escalation")) return "Privilege escalation blocked";
-  if (r.includes("revoked")) return "Agent revoked";
-  if (r.includes("prompt injection")) return "Prompt injection blocked";
-  if (r.includes("blocked by admin")) return "Tool blocked by admin";
-  if (r.includes("human reviewer") || r.includes("no approval")) return "Not approved by a human";
-  if (r.includes("invalid token") || r.includes("bearer")) return "Invalid or missing token";
-  if (r.includes("not registered") || r.includes("sign-in failed")) return "Unrecognized identity";
-  if (r.includes("default deny") || r.includes("not found")) return "Tool not in policy";
-  if (r.includes("guardrail unavailable")) return "Safety scan unavailable";
+  if (r.includes("privilege escalation")) return "Privilege escalation";
+  if (r.includes("revoked")) return "Badge revoked";
+  if (r.includes("prompt injection")) return "Prompt injection";
+  if (r.includes("blocked by admin") || r.includes("admin blocked")) return "Blocked by admin";
+  if (r.includes("human reviewer") || r.includes("no approval")) return "Not approved";
+  if (r.includes("sub-agents may never")) return "Sub-agent in production";
+  if (r.includes("invalid token") || r.includes("bearer")) return "Forged or missing token";
+  if (r.includes("not registered") || r.includes("sign-in failed")) return "Unknown identity";
+  if (r.includes("default deny") || r.includes("not found")) return "No policy permits it";
+  if (r.includes("unavailable")) return "Failed closed";
   return "Other";
+}
+
+// badge cosmetics derived from the agent id (stable across reloads)
+function hash(s) { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const badgeNo = id => { const h = hash(id).toString(16).toUpperCase().padStart(8, "0"); return `${h.slice(0, 2)}-${h.slice(2, 6)}`; };
+function initials(name) {
+  const last = String(name).split("›").pop().trim();
+  const parts = last.split(/[-_\s]+/).filter(Boolean);
+  return ((parts[0] || "?")[0] + ((parts[1] || "")[0] || "")).toUpperCase();
+}
+function barcode(id) {
+  let h = hash(id), x = 0, bars = "";
+  for (let i = 0; i < 34; i++) { h = Math.imul(h ^ (h >>> 13), 2654435761) >>> 0; const w = 1 + (h % 3); if (i % 2 === 0) bars += `<rect x="${x}" y="0" width="${w}" height="28"/>`; x += w + 1; }
+  return `<svg class="barcode" viewBox="0 0 ${x} 28" width="${x}" height="28" aria-hidden="true">${bars}</svg>`;
+}
+function identity(a) {
+  if (a.identity === "red-team") return { color: "var(--id-red)", label: "RED TEAM", kind: "Attack lab identity", icon: ICON.red };
+  if (a.identity === "delegated") return { color: "var(--id-sub)", label: "SUB-AGENT", kind: `Issued by ${nameOf(a.parent)}`, icon: ICON.sub };
+  if (a.identity === "aws-iam") return { color: "var(--id-aws)", label: "AWS IAM", kind: "AWS IAM role · no stored secret", icon: ICON.aws };
+  return { color: "var(--id-auth0)", label: "AUTH0", kind: "Auth0 · machine-to-machine", icon: ICON.auth0 };
 }
 
 // ---------- api ----------
@@ -332,11 +405,11 @@ async function act(path, msg) {
   poll();
 }
 const nameOf = id => (S.agents.find(a => a.agent_id === id) || {}).name || id;
-window.revokeAgent = id => act(`/api/agents/${encodeURIComponent(id)}/revoke`, `Revoked ${nameOf(id)}. Its next call will be blocked.`);
-window.restoreAgent = id => act(`/api/agents/${encodeURIComponent(id)}/restore`, `Restored access for ${nameOf(id)}.`);
-window.untaint = id => act(`/api/agents/${encodeURIComponent(id)}/untaint`, `Cleared the taint on ${nameOf(id)}.`);
-window.toggleTool = (id, tool) => act(`/api/agents/${encodeURIComponent(id)}/tools/${encodeURIComponent(tool)}/toggle`, `Updated ${tool} for ${nameOf(id)}.`);
-window.decide = (id, d) => act(`/api/approvals/${id}/${d}`, d === "approve" ? "Approved. The call is running." : "Denied. The agent was told no.");
+window.revokeAgent = id => act(`/api/agents/${encodeURIComponent(id)}/revoke`, `Badge revoked: ${nameOf(id)}. Its next call is blocked.`);
+window.restoreAgent = id => act(`/api/agents/${encodeURIComponent(id)}/restore`, `Badge restored: ${nameOf(id)}.`);
+window.untaint = id => act(`/api/agents/${encodeURIComponent(id)}/untaint`, `Taint cleared on ${nameOf(id)}.`);
+window.toggleTool = (id, tool) => act(`/api/agents/${encodeURIComponent(id)}/tools/${encodeURIComponent(tool)}/toggle`, `Door updated: ${tool} for ${nameOf(id)}.`);
+window.decide = (id, d) => act(`/api/approvals/${id}/${d}`, d === "approve" ? "Approved. The call is going through." : "Denied. The agent was told no.");
 
 // ---------- charts ----------
 const tip = document.getElementById("tip");
@@ -349,7 +422,6 @@ function showTip(html, ev) {
   tip.style.left = x + "px"; tip.style.top = y + "px";
 }
 const hideTip = () => tip.classList.remove("on");
-
 function niceTicks(max) {
   if (max <= 0) return [0, 1, 2];
   const raw = max / 3, mag = 10 ** Math.floor(Math.log10(raw));
@@ -362,7 +434,6 @@ function topRounded(x, y, w, h, r) {
   r = Math.min(r, h, w / 2);
   return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
 }
-
 function decisionBuckets() {
   const now = Math.floor(Date.now() / 60000), n = 30, b = [];
   for (let i = n - 1; i >= 0; i--) b.push({ m: now - i, allow: 0, deny: 0 });
@@ -375,14 +446,13 @@ function decisionBuckets() {
   return b;
 }
 function drawDecisions(el) {
-  const b = decisionBuckets();
-  const key = JSON.stringify(b) + el.clientWidth;
+  const b = decisionBuckets(), key = JSON.stringify(b) + el.clientWidth + theme;
   if (el._key === key) return; el._key = key;
-  const W = Math.max(280, el.clientWidth), H = 220, L = 34, R = 6, T = 10, B = 26;
+  const W = Math.max(280, el.clientWidth), H = 230, L = 34, R = 6, T = 10, B = 26;
   const pw = W - L - R, ph = H - T - B, band = pw / b.length, bw = Math.min(24, band * 0.62);
   const max = Math.max(...b.map(d => d.allow + d.deny)), ticks = niceTicks(max), top = ticks[ticks.length - 1];
   const y = v => T + ph - (v / top) * ph;
-  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Allowed and denied decisions per minute, last 30 minutes">`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Granted and denied calls per minute, last 30 minutes">`;
   for (const t of ticks) s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/><text x="${L - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`;
   s += `<line x1="${L}" x2="${W - R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/>`;
   b.forEach((d, i) => {
@@ -402,26 +472,25 @@ function drawDecisions(el) {
   el.onmousemove = ev => {
     const i = ev.target.dataset && ev.target.dataset.i; if (i === undefined) return hideTip();
     const d = b[+i], t = new Date(d.m * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-    showTip(`<div class="t">${t}</div><div class="r"><i style="background:var(--s-allow)"></i>Allowed<b>${d.allow}</b></div><div class="r"><i style="background:var(--s-deny)"></i>Denied<b>${d.deny}</b></div>`, ev);
+    showTip(`<div class="t">${t}</div><div class="r"><i style="background:var(--s-allow)"></i>Granted<b>${d.allow}</b></div><div class="r"><i style="background:var(--s-deny)"></i>Denied<b>${d.deny}</b></div>`, ev);
   };
   el.onmouseleave = hideTip;
 }
-
 function drawReasons(el) {
   const counts = {};
   for (const e of S.events) if (e.decision === "deny") { const c = denyCategory(e.reason); counts[c] = (counts[c] || 0) + 1; }
   const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
-  const key = JSON.stringify(rows) + el.clientWidth;
+  const key = JSON.stringify(rows) + el.clientWidth + theme;
   if (el._key === key) return; el._key = key;
   if (!rows.length) { el.innerHTML = `<div class="empty">No denials yet</div>`; el.onmousemove = null; return; }
   const total = rows.reduce((s, r) => s + r[1], 0), max = rows[0][1];
-  const W = Math.max(260, el.clientWidth), rowH = 34, H = rows.length * rowH, labW = Math.min(170, W * 0.48), valW = 34;
+  const W = Math.max(260, el.clientWidth), rowH = 34, H = rows.length * rowH, labW = Math.min(176, W * 0.5), valW = 34;
   const pw = W - labW - valW;
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Denied calls by reason">`;
   rows.forEach(([name, n], i) => {
-    const yc = i * rowH + rowH / 2, w = Math.max(3, (n / max) * pw), x = labW;
+    const yc = i * rowH + rowH / 2, w = Math.max(3, (n / max) * pw), x = labW, r = Math.min(4, w / 2);
     s += `<text class="lbl" x="0" y="${yc + 4}">${esc(name)}</text>`;
-    s += `<path d="M${x},${yc - 10}H${x + w - Math.min(4, w / 2)}Q${x + w},${yc - 10} ${x + w},${yc - 10 + Math.min(4, w / 2)}V${yc + 10 - Math.min(4, w / 2)}Q${x + w},${yc + 10} ${x + w - Math.min(4, w / 2)},${yc + 10}H${x}Z" fill="var(--s-deny)"/>`;
+    s += `<path d="M${x},${yc - 10}H${x + w - r}Q${x + w},${yc - 10} ${x + w},${yc - 10 + r}V${yc + 10 - r}Q${x + w},${yc + 10} ${x + w - r},${yc + 10}H${x}Z" fill="var(--s-deny)"/>`;
     s += `<text class="val" x="${x + w + 8}" y="${yc + 4}">${n}</text>`;
     s += `<rect class="hit" data-i="${i}" x="0" y="${i * rowH}" width="${W}" height="${rowH}" fill="transparent"/>`;
   });
@@ -429,157 +498,145 @@ function drawReasons(el) {
   el.onmousemove = ev => {
     const i = ev.target.dataset && ev.target.dataset.i; if (i === undefined) return hideTip();
     const [name, n] = rows[+i];
-    showTip(`<div class="t">${esc(name)}</div><div class="r">Denied calls<b>${n}</b></div><div class="r">Share of denials<b>${Math.round((n / total) * 100)}%</b></div>`, ev);
+    showTip(`<div class="t">${esc(name)}</div><div class="r">Denied calls<b>${n}</b></div><div class="r">Share<b>${Math.round((n / total) * 100)}%</b></div>`, ev);
   };
   el.onmouseleave = hideTip;
 }
 
 // ---------- shared fragments ----------
 function feedHTML(events) {
-  if (!events.length) return `<div class="empty">Waiting for agent traffic…</div>`;
-  return `<div class="feed">${events.map(e => `<div class="ev"><span class="t muted num">${fmtTime(e.ts)}</span><span class="agentc">${esc(e.agent_name)}</span><span class="what"><span class="mono">${esc(action(e))}</span> <span class="muted">· ${esc(e.reason)}</span></span>${pill(e.decision)}</div>`).join("")}</div>`;
+  if (!events.length) return `<div class="empty">No swipes yet</div>`;
+  return `<div class="feed">${events.map(e => `<div class="ev"><span class="t">${fmtTime(e.ts)}</span><span class="who">${esc(e.agent_name)}</span><span class="what"><b>${esc(action(e))}</b> · ${esc(e.reason)}</span>${pill(e.decision)}</div>`).join("")}</div>`;
 }
-function approvalCard(a) {
-  const args = Object.entries(a.arguments || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ");
-  return `<div class="approval">
-    <div class="row"><span class="pill pending">Waiting</span><b>${esc(a.agent_name)}</b><span class="muted">wants to run a high-risk call · ${agoSpan(a.ts)}</span></div>
+function requestCard(a) {
+  const args = Object.entries(a.arguments || {}).filter(([k]) => k !== "content").map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ");
+  return `<div class="request">
+    <div class="row"><span class="pill pending">Held at the desk</span><b>${esc(a.agent_name)}</b><span class="muted">wants through · waiting ${agoSpan(a.ts)}</span></div>
     <div class="call">${esc(a.tool)}(${esc(args)})</div>
-    <div class="row"><span class="muted">The agent is paused until you decide. No decision within ${S.policy ? S.policy.approval_timeout : 120}s means no.</span>
+    <div class="row"><span class="muted">The agent is paused until you decide. No answer within ${S.policy ? S.policy.approval_timeout : 120}s means no.</span>
       <button class="btn good" onclick="decide(${a.id},'approve')">Approve</button>
       <button class="btn danger" onclick="decide(${a.id},'deny')">Deny</button></div>
   </div>`;
 }
-function identityBadge(a) {
-  if (a.identity === "red-team") return `<span class="badge">${ICON.sub}Attack lab identity</span>`;
-  if (a.identity === "delegated") return `<span class="badge">${ICON.sub}Sub-agent of ${esc(nameOf(a.parent))} · scoped token</span>`;
-  return a.identity === "aws-iam"
-    ? `<span class="badge">${ICON.aws}AWS IAM role · no stored secret</span>`
-    : `<span class="badge">${ICON.auth0}Auth0 · machine-to-machine</span>`;
-}
-function avatarIcon(a) { return a.identity === "aws-iam" ? ICON.aws : a.identity === "delegated" ? ICON.sub : ICON.auth0; }
 function agentTree(agents) {
-  // parents first, each followed by its sub-agents
-  const kids = {}, byId = new Set(agents.map(a => a.agent_id)), out = [];
+  const kids = {}, byId = new Set(agents.map(a => a.agent_id));
   agents.forEach(a => { const p = a.parent && byId.has(a.parent) ? a.parent : ""; (kids[p] = kids[p] || []).push(a); });
-  const walk = (p, depth) => (kids[p] || []).forEach(a => { out.push([a, depth]); walk(a.agent_id, depth + 1); });
-  walk("", 0);
-  return out;
+  return { roots: kids[""] || [], kids };
 }
 function setHTML(el, html) { if (el && el._html !== html) { el.innerHTML = html; el._html = html; } }
+
+function badgeHTML(a) {
+  const mine = S.events.filter(e => e.agent_id === a.agent_id);
+  const granted = mine.filter(e => e.decision === "allow" && e.method === "tools/call").length;
+  const denied = mine.filter(e => e.decision === "deny").length;
+  const id = esc(JSON.stringify(a.agent_id)), idn = identity(a);
+  const rev = a.revoked, cut = !rev && a.revoked_by_parent, taint = a.taint;
+  const doors = a.tools.map(t => {
+    const title = t.status === "no-scope" ? `No access: needs ${t.scope}` : t.status === "blocked" ? "Locked by an admin. Click to unlock." : `Open via ${t.scope}. Click to lock for this agent.`;
+    const click = t.status === "no-scope" ? "disabled" : `onclick='toggleTool(${id}, ${esc(JSON.stringify(t.name))})'`;
+    return `<button class="door ${t.status}" ${click} title="${esc(title)}"><i></i>${esc(t.name)}</button>`;
+  }).join("");
+  const stamp = rev ? `<div class="stamp">Revoked<small>${rev.grant_scopes ? "Auth0 grant removed" : "at the gateway"}</small></div>`
+    : cut ? `<div class="stamp">Void<small>${esc(cut)} was revoked</small></div>` : "";
+  const hazard = taint ? `<div class="hazard" title="${esc(taint.reason)}"><span>Tainted · ${esc(taint.reason.replace("read a prompt injection in ", "injection in "))}</span></div>` : "";
+  const actions = rev ? `<button class="btn" onclick='restoreAgent(${id})'>Restore badge</button><span class="note">revoked ${agoSpan(rev.revoked_at)}</span>`
+    : cut ? `<span class="note">Restore ${esc(cut)} to bring this badge back</span>`
+    : `<button class="btn danger" onclick='revokeAgent(${id})'>Revoke badge</button><span class="note">last swipe ${agoSpan(a.last_seen)}</span>`;
+  return `<div class="holder">
+    <div class="badge ${rev || cut ? "void" : ""} ${taint ? "tainted" : ""}" style="--idc:${idn.color};--strap:${idn.color}">
+      <div class="strap"></div><div class="clip"></div>
+      <div class="card">
+        ${hazard}${stamp}
+        <div class="card-inner">
+          <div class="slot"></div>
+          <div class="band"><span>Pinecrest · Agent pass</span><span>${idn.label}</span></div>
+          <div class="body">
+            <div class="photo">${esc(initials(a.name))}${idn.icon}</div>
+            <div><div class="nm">${esc(a.name)}</div><div class="kind">${esc(idn.kind)}</div><div class="no">No. ${badgeNo(a.agent_id)}</div></div>
+          </div>
+          <div class="sec"><div class="sec-t">Doors</div><div class="doors">${doors}</div></div>
+          <div class="facts"><div><b>${granted}</b><span>granted</span></div><div><b>${denied}</b><span>denied</span></div><div><b>${(a.scopes || "").split(" ").filter(Boolean).length}</b><span>scopes</span></div></div>
+          <div class="foot"><span class="id">${esc(a.agent_id)}</span>${barcode(a.agent_id)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">${taint ? `<button class="btn" onclick='untaint(${id})'>Clear taint</button>` : ""}${actions}</div>
+    <div class="swipes">${feedHTML(mine.filter(e => e.method !== "tools/list").slice(-3).reverse())}</div>
+  </div>`;
+}
 
 // ---------- views ----------
 const VIEWS = {
   overview: {
     title: "Overview",
-    desc: "Every tool call your AI agents make passes through Lanyard. Here is what they are doing right now.",
+    desc: "Every tool call an AI agent makes is a swipe at a door. Lanyard checks the badge, the policy and the content, then grants or denies.",
     mount: v => v.innerHTML = `
       <section class="tiles">
-        <div class="tile"><div class="label"><i style="background:var(--s-allow)"></i>Calls allowed</div><div class="value" id="t-allow">0</div><div class="note">verified identity and permission</div></div>
-        <div class="tile"><div class="label"><i style="background:var(--s-deny)"></i>Calls denied</div><div class="value" id="t-deny">0</div><div class="note" id="t-deny-n">blocked before reaching a tool</div></div>
-        <div class="tile"><div class="label">Awaiting approval</div><div class="value" id="t-pend">0</div><div class="note">high-risk calls paused for a human</div></div>
-        <div class="tile"><div class="label">Agents</div><div class="value" id="t-agents">0</div><div class="note" id="t-agents-n">none seen yet</div></div>
+        <div class="tile"><div class="label"><i style="background:var(--s-allow)"></i>Doors opened</div><div class="value" id="t-allow">0</div><div class="note">calls granted after checks</div></div>
+        <div class="tile"><div class="label"><i style="background:var(--s-deny)"></i>Doors refused</div><div class="value" id="t-deny">0</div><div class="note">blocked before reaching a tool</div></div>
+        <div class="tile"><div class="label">Held at the desk</div><div class="value" id="t-pend">0</div><div class="note">waiting for a human</div></div>
+        <div class="tile"><div class="label">Badges issued</div><div class="value" id="t-agents">0</div><div class="note" id="t-agents-n">none yet</div></div>
       </section>
       <div class="grid2">
-        <div class="panel"><div class="panel-h"><h3>Decisions per minute</h3><span class="sub">last 30 minutes</span><div class="legend right"><span><i style="background:var(--s-allow)"></i>Allowed</span><span><i style="background:var(--s-deny)"></i>Denied</span></div></div><div class="chart" id="c-dec"></div></div>
-        <div class="panel"><div class="panel-h"><h3>Why calls were denied</h3><span class="sub">all denials</span></div><div class="chart" id="c-why"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Swipes per minute</h3><span class="sub">last 30 minutes</span><div class="legend right"><span><i style="background:var(--s-allow)"></i>Granted</span><span><i style="background:var(--s-deny)"></i>Denied</span></div></div><div class="chart" id="c-dec"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Why doors stayed shut</h3><span class="sub">all denials</span></div><div class="chart" id="c-why"></div></div>
       </div>
       <div class="grid2">
-        <div class="panel"><div class="panel-h"><h3>Recent activity</h3><a class="right" href="#/audit">Full audit log →</a></div><div id="o-feed"></div></div>
-        <div class="panel"><div class="panel-h"><h3>Needs your approval</h3></div><div id="o-appr"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Latest swipes</h3><a class="right" href="#/audit">Access log →</a></div><div id="o-feed"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Security desk</h3><a class="right" href="#/approvals">Approvals →</a></div><div id="o-appr"></div></div>
       </div>`,
     update() {
-      const calls = S.events.filter(isCall);
-      document.getElementById("t-allow").textContent = calls.filter(e => e.decision === "allow").length.toLocaleString();
+      document.getElementById("t-allow").textContent = S.events.filter(e => e.method === "tools/call" && e.decision === "allow").length.toLocaleString();
       document.getElementById("t-deny").textContent = S.events.filter(e => e.decision === "deny").length.toLocaleString();
       document.getElementById("t-pend").textContent = S.approvals.length;
-      const rev = S.agents.filter(a => a.revoked).length;
+      const rev = S.agents.filter(a => a.revoked).length, tainted = S.agents.filter(a => a.taint).length;
       document.getElementById("t-agents").textContent = S.agents.length;
-      const tainted = S.agents.filter(a => a.taint).length;
       document.getElementById("t-agents-n").textContent = S.agents.length
-        ? [rev ? `${rev} revoked` : "", tainted ? `${tainted} tainted` : ""].filter(Boolean).join(" · ") || "all active" : "none seen yet";
+        ? [rev ? `${rev} revoked` : "", tainted ? `${tainted} tainted` : ""].filter(Boolean).join(" · ") || "all active" : "none yet";
       drawDecisions(document.getElementById("c-dec"));
       drawReasons(document.getElementById("c-why"));
       setHTML(document.getElementById("o-feed"), feedHTML(S.events.filter(e => e.method !== "tools/list").slice(-8).reverse()));
-      setHTML(document.getElementById("o-appr"), S.approvals.length ? `<div style="display:grid;gap:12px">${S.approvals.map(approvalCard).join("")}</div>` : `<div class="empty">Nothing waiting. Production deploys will appear here.</div>`);
+      setHTML(document.getElementById("o-appr"), S.approvals.length ? `<div class="desk">${S.approvals.map(requestCard).join("")}</div>` : `<div class="empty">Nobody waiting. Production deploys and tainted agents stop here.</div>`);
     },
   },
 
   agents: {
-    title: "Agents",
-    desc: "Each agent has its own identity. Revoke one and its very next call is blocked, even if its token has not expired.",
-    mount: v => v.innerHTML = `<div id="a-list" style="display:grid;gap:18px"></div>`,
+    title: "Agent badges",
+    desc: "Every agent wears a badge: its identity, and the doors (tools) it may open. Revoke a badge and its very next swipe is refused, even if its token hasn't expired.",
+    mount: v => v.innerHTML = `<div id="a-list" class="families"></div>`,
     update() {
-      const html = S.agents.length ? agentTree(S.agents).map(([a, depth]) => {
-        const mine = S.events.filter(e => e.agent_id === a.agent_id);
-        const allowed = mine.filter(e => e.decision === "allow" && isCall(e)).length, denied = mine.filter(e => e.decision === "deny").length;
-        const id = esc(JSON.stringify(a.agent_id));
-        const rev = a.revoked, cut = !rev && a.revoked_by_parent, taint = a.taint;
-        const chips = a.tools.map(t => {
-          const sub = t.status === "no-scope" ? `needs ${t.scope}` : t.status === "blocked" ? "blocked by you" : `via ${t.scope}`;
-          const click = t.status === "no-scope" ? "disabled" : `onclick='toggleTool(${id}, ${esc(JSON.stringify(t.name))})'`;
-          return `<button class="chip ${t.status}" ${click} title="${t.status === "no-scope" ? "Not in this agent's token" : "Click to " + (t.status === "blocked" ? "allow" : "block")}"><span class="dot"></span><span><span class="tn">${esc(t.name)}</span><span class="ts">${esc(sub)}</span></span></button>`;
-        }).join("");
-        const status = rev ? `<span class="pill deny">Revoked</span><button class="btn" onclick='restoreAgent(${id})'>Restore access</button>`
-          : cut ? `<span class="pill deny">Cut off</span><span class="muted" style="font-size:12.5px">${esc(cut)} was revoked</span>`
-          : `<span class="pill allow">Active</span><button class="btn danger" onclick='revokeAgent(${id})'>Revoke</button>`;
-        const taintBtn = taint ? `<span class="pill pending" title="${esc(taint.reason)}">Tainted</span><button class="btn" onclick='untaint(${id})'>Clear taint</button>` : "";
-        return `<article class="panel agent ${rev || cut ? "revoked" : ""}" style="margin-left:${Math.min(depth, 3) * 28}px">
-          <div class="agent-h">
-            <div class="avatar">${avatarIcon(a)}</div>
-            <div class="who"><span class="name">${esc(a.name)}</span>${identityBadge(a)}</div>
-            <div class="actions">${taintBtn}${status}</div>
-          </div>
-          <div class="agent-b">
-            <div>
-              <p class="sec-title">Identity</p>
-              <dl class="kv">
-                <dt>Agent ID</dt><dd class="mono">${esc(a.agent_id)}</dd>
-                <dt>Token scopes</dt><dd><div class="scopes">${(a.scopes || "").split(" ").filter(Boolean).map(s => `<span class="scope">${esc(s)}</span>`).join("") || "none"}</div></dd>
-                <dt>Last seen</dt><dd>${agoSpan(a.last_seen)}</dd>
-                <dt>Calls</dt><dd>${allowed} allowed · ${denied} denied</dd>
-                ${rev ? `<dt>Revoked</dt><dd>${agoSpan(rev.revoked_at)}${rev.grant_scopes ? " · Auth0 grant removed" : ""}</dd>` : ""}
-                ${taint ? `<dt>Tainted</dt><dd>${esc(taint.reason)} · risky tools need approval</dd>` : ""}
-              </dl>
-            </div>
-            <div>
-              <p class="sec-title">Tool access</p>
-              <div class="chips">${chips}</div>
-              <p class="hint">Green tools are allowed. Click one to block it for this agent only; click again to allow. Grey tools need a permission this agent's token does not have.</p>
-            </div>
-          </div>
-          <div class="agent-f"><p class="sec-title" style="margin:0">Latest activity</p>${feedHTML(mine.filter(e => e.method !== "tools/list").slice(-4).reverse())}</div>
-        </article>`;
-      }).join("") : `<div class="panel empty">No agents yet. They appear here after their first request.</div>`;
-      setHTML(document.getElementById("a-list"), html);
+      const { roots, kids } = agentTree(S.agents);
+      const family = a => `<div class="family">${badgeHTML(a)}${(kids[a.agent_id] || []).length ? `<div class="kids">${kids[a.agent_id].map(family).join("")}</div>` : ""}</div>`;
+      setHTML(document.getElementById("a-list"), roots.length ? roots.map(family).join("") : `<div class="panel empty">No badges yet. Agents appear here after their first request.</div>`);
     },
   },
 
   approvals: {
-    title: "Approvals",
-    desc: "High-risk calls, like production deploys, wait here until a person approves them, even when the agent has permission.",
+    title: "Security desk",
+    desc: "Risky calls stop here until a person decides: production deploys, and anything risky from an agent that has read a prompt injection.",
     mount: v => v.innerHTML = `
       <div class="panel"><div class="panel-h"><h3>Waiting for you</h3></div><div id="p-now"></div></div>
-      <div class="panel"><div class="panel-h"><h3>Decision history</h3></div><div id="p-hist"></div></div>`,
+      <div class="panel"><div class="panel-h"><h3>Desk history</h3></div><div id="p-hist"></div></div>`,
     update() {
-      setHTML(document.getElementById("p-now"), S.approvals.length ? `<div style="display:grid;gap:12px">${S.approvals.map(approvalCard).join("")}</div>` : `<div class="empty">Nothing waiting right now.</div>`);
+      setHTML(document.getElementById("p-now"), S.approvals.length ? `<div class="desk">${S.approvals.map(requestCard).join("")}</div>` : `<div class="empty">Nobody waiting right now.</div>`);
       const hist = S.events.filter(e => e.decision === "pending" || /approved by human|human reviewer|no approval|awaiting approval|human (approved|denied)/.test(e.reason)).slice(-30).reverse();
       setHTML(document.getElementById("p-hist"), feedHTML(hist));
     },
   },
 
   audit: {
-    title: "Audit log",
-    desc: "Every decision Lanyard made, with the reason. Click a row for the full details.",
+    title: "Access log",
+    desc: "Every swipe Lanyard decided, with the reason. Click a row for the full record. Every entry is also archived to S3 with Object Lock.",
     mount: v => {
       v.innerHTML = `<div class="panel">
         <div class="toolbar">
-          <input id="f-q" type="search" placeholder="Search tool, agent or reason" aria-label="Search">
+          <input id="f-q" type="search" placeholder="Search door, agent or reason" aria-label="Search">
           <select id="f-agent" aria-label="Agent"><option value="">All agents</option></select>
-          <select id="f-dec" aria-label="Decision"><option value="">All decisions</option><option value="allow">Allowed</option><option value="deny">Denied</option><option value="pending">Pending</option><option value="admin">Admin</option></select>
+          <select id="f-dec" aria-label="Outcome"><option value="">All outcomes</option><option value="allow">Granted</option><option value="deny">Denied</option><option value="pending">Held</option><option value="admin">Admin</option></select>
           <button class="btn" id="f-csv" type="button">Download CSV</button>
         </div>
-        <div class="tablewrap"><table><thead><tr><th>Time</th><th>Agent</th><th>Action</th><th>Decision</th><th>Reason</th><th class="num">ms</th></tr></thead><tbody id="g-body"></tbody></table></div>
-        <p class="hint" id="g-count"></p>
+        <div class="tablewrap"><table><thead><tr><th>Time</th><th>Agent</th><th>Door</th><th>Outcome</th><th>Reason</th><th class="num">ms</th></tr></thead><tbody id="g-body"></tbody></table></div>
+        <p class="muted" id="g-count" style="margin:12px 0 0;font-size:12.5px"></p>
       </div>`;
       ["f-q", "f-agent", "f-dec"].forEach(id => document.getElementById(id).addEventListener("input", () => VIEWS.audit.update(true)));
       document.getElementById("f-csv").onclick = downloadCSV;
@@ -599,21 +656,21 @@ const VIEWS = {
       if (sel._opts !== opts) { const cur = sel.value; sel.innerHTML = opts; sel.value = cur; sel._opts = opts; }
       const rows = this.filtered(), shown = rows.slice(0, 300), body = document.getElementById("g-body");
       const html = shown.map(e => {
-        const main = `<tr class="ev-row" data-id="${e.id}"><td class="t">${fmtTime(e.ts)}</td><td>${esc(e.agent_name)}</td><td class="mono">${esc(action(e))}</td><td>${pill(e.decision)}</td><td>${esc(e.reason)}</td><td class="num muted">${e.latency_ms || ""}</td></tr>`;
+        const main = `<tr class="ev-row" data-id="${e.id}"><td class="t">${fmtTime(e.ts)}</td><td>${esc(e.agent_name)}</td><td class="mono">${esc(action(e))}</td><td>${pill(e.decision)}</td><td>${esc(e.reason)}</td><td class="num muted mono">${e.latency_ms || ""}</td></tr>`;
         if (!expanded.has(e.id)) return main;
         const detail = Object.assign({ agent_id: e.agent_id, at: new Date(e.ts * 1000).toISOString() }, e.detail || {});
         return main + `<tr class="detail"><td></td><td colspan="5"><pre class="json">${esc(JSON.stringify(detail, null, 2))}</pre></td></tr>`;
-      }).join("") || `<tr><td colspan="6" class="empty">No matching events</td></tr>`;
+      }).join("") || `<tr><td colspan="6" class="empty">No matching swipes</td></tr>`;
       if (force || body._html !== html) { body.innerHTML = html; body._html = html; }
-      document.getElementById("g-count").textContent = `${rows.length.toLocaleString()} events${rows.length > 300 ? " (showing the latest 300)" : ""}`;
+      document.getElementById("g-count").textContent = `${rows.length.toLocaleString()} entries${rows.length > 300 ? " (showing the latest 300)" : ""}`;
     },
   },
 
   attacks: {
     title: "Attack lab",
-    desc: "Real attacks against this gateway, sent through the same endpoints an attacker would use. Each one should be blocked.",
+    desc: "Real attacks against this live gateway, sent through the same endpoints an attacker would use. Each one should be stopped.",
     mount: async v => {
-      v.innerHTML = `<div class="panel"><div class="panel-h"><h3>Red team</h3><span class="sub">attacks run as red-team-bot and appear in the audit log</span><button class="btn right" onclick="runAllAttacks()">Run all attacks</button></div><div class="attacks" id="atk"></div></div>`;
+      v.innerHTML = `<div class="panel"><div class="panel-h"><h3>Red team</h3><span class="sub">runs as red-team-bot · every attempt lands in the access log</span><button class="btn danger right" onclick="runAllAttacks()">Run all attacks</button></div><div class="attacks" id="atk"></div></div>`;
       if (!S.attacks) { try { S.attacks = (await api("/api/attacks")).attacks; } catch (e) { S.attacks = []; } }
       VIEWS.attacks.update(true);
     },
@@ -621,13 +678,11 @@ const VIEWS = {
       const el = document.getElementById("atk"); if (!el || !S.attacks) return;
       const html = S.attacks.map(a => {
         const r = ATTACK_RESULTS[a.id];
-        const res = !r ? "" : r.blocked === true ? `<div class="res ok"><span class="pill allow">Blocked</span><span class="mono">${esc(r.observed)}</span></div>`
-          : r.blocked === false ? `<div class="res bad"><span class="pill deny">Not blocked</span><span class="mono">${esc(r.observed)}</span></div>`
-          : `<div class="res skip"><span class="pill admin">Skipped</span><span class="mono">${esc(r.observed)}</span></div>`;
-        return `<div class="panel attack"><h3>${esc(a.title)}</h3>
-          <div class="goal"><b>Attacker tries</b>${esc(a.goal)}</div>
-          <div class="def"><b>Lanyard's defense</b>${esc(a.defense)}</div>
-          ${res}
+        const verdict = !r ? "" : r.blocked === true ? `<span class="verdict ok">Blocked</span>` : r.blocked === false ? `<span class="verdict bad">Got through</span>` : `<span class="verdict skip">Skipped</span>`;
+        return `<div class="attack">${verdict}<h3>${esc(a.title)}</h3>
+          <div><span class="k">Attacker tries</span><p>${esc(a.goal)}</p></div>
+          <div><span class="k">Lanyard's defense</span><p>${esc(a.defense)}</p></div>
+          ${r ? `<div class="res">${esc(r.observed)}</div>` : ""}
           <div class="row"><button class="btn" data-attack="${esc(a.id)}" onclick="runAttack('${esc(a.id)}')">${r ? "Run again" : "Run attack"}</button></div></div>`;
       }).join("");
       if (force || el._html !== html) { el.innerHTML = html; el._html = html; }
@@ -636,8 +691,8 @@ const VIEWS = {
 
   policy: {
     title: "Policy",
-    desc: "The rules Lanyard enforces on every call. Tools with no rule are denied by default.",
-    mount: v => v.innerHTML = `<div id="pol" style="display:grid;gap:18px"></div>`,
+    desc: "The rules behind every door. Amazon Verified Permissions evaluates them on each call; anything not explicitly permitted is denied.",
+    mount: v => v.innerHTML = `<div id="pol" style="display:grid;gap:20px"></div>`,
     update() {
       const p = S.policy; if (!p) return setHTML(document.getElementById("pol"), `<div class="panel empty">Loading policy…</div>`);
       const check = (on, title, sub) => `<div class="check"><span class="ic ${on ? "on" : "off"}">${on ? "✓" : "–"}</span><div><b>${title}</b><span>${sub}</span></div></div>`;
@@ -647,35 +702,34 @@ const VIEWS = {
           <div class="panel"><div class="panel-h"><h3>Identity</h3></div>
             <dl class="kv">
               <dt>Enterprise IdP</dt><dd>Auth0 (Okta) · <span class="mono">${esc(p.auth0_domain)}</span></dd>
-              <dt>Agent sign-in</dt><dd>OAuth 2.0 client credentials, RS256 JWT verified against Auth0's public keys</dd>
+              <dt>Agent sign-in</dt><dd>OAuth 2.0 client credentials, RS256 JWT checked against Auth0's public keys</dd>
               <dt>Workloads</dt><dd>${p.workloads.length ? `AWS IAM roles in account <span class="mono">${esc(p.aws_account)}</span>, ${p.workload_token_minutes}-minute Lanyard tokens` : "not enabled"}</dd>
-              ${p.files_bucket ? `<dt>File share</dt><dd>Amazon S3 · <span class="mono">${esc(p.files_bucket)}</span> (private, encrypted)</dd>` : ""}
               ${p.token_signing ? `<dt>Lanyard tokens</dt><dd>${esc(p.token_signing)} · <a href="/.well-known/jwks.json" target="_blank">public key</a></dd>` : ""}
-              <dt>Revocation key</dt><dd>The agent's identity (client ID or IAM role), not its token</dd>
+              ${p.files_bucket ? `<dt>File share</dt><dd>Amazon S3 · <span class="mono">${esc(p.files_bucket)}</span></dd>` : ""}
+              <dt>Revocation key</dt><dd>The agent's identity (client ID or IAM role), never the token</dd>
             </dl></div>
           <div class="panel"><div class="panel-h"><h3>Safeguards</h3></div><div class="checks">
-            ${check(true, "Policy engine: " + esc(p.policy_engine), p.cedar_policies && p.cedar_policies.length ? "AWS evaluates Cedar policies on every tool call; if it can't answer, the call is denied" : "Rules built into the gateway")}
-            ${check(true, "Default deny", "Tools without a rule cannot be called")}
-            ${check(true, "Revocation checked on every call", `Shared state in ${esc(p.store)}${p.store === "DynamoDB" ? " with strongly consistent reads" : ""}`)}
+            ${check(true, "Policy engine: " + esc(p.policy_engine), p.cedar_policies && p.cedar_policies.length ? "Evaluated on every tool call; if AWS can't answer, the call is denied" : "Rules built into the gateway")}
+            ${check(true, "Default deny", "Doors without a rule stay shut")}
+            ${check(true, "Revocation checked first, on every call", `Shared state in ${esc(p.store)}${p.store === "DynamoDB" ? " with strongly consistent reads" : ""}`)}
             ${check(p.auth0_cutoff, "Cut off at Auth0 on revoke", p.auth0_cutoff ? "Revoking also removes the agent's Auth0 grant" : "Not configured: revocation applies at the gateway only")}
             ${check(p.guardrail, "Bedrock Guardrails on tool responses", p.guardrail ? `Blocks prompt injection, masks emails and phones; fails ${esc(p.guardrail_fail)}` : "Not configured")}
-            ${check(true, "Human approval for high-risk calls", `Undecided requests expire after ${p.approval_timeout}s`)}
-            ${check(p.guardrail, "Taint after prompt injection", `An agent that read an injection needs approval for ${(p.risky_scopes || []).join(", ")} until an admin clears it`)}
-            ${check(!!p.audit_archive, "Tamper-proof audit archive", p.audit_archive ? `Every decision copied to s3://${esc(p.audit_archive)} with Object Lock: nobody can edit or delete it` : "Local log only (cloud deploys archive to S3 with Object Lock)")}
-            ${check(true, "Sub-agents can't exceed their parent", `Up to ${p.max_delegation_depth} levels; revoking a parent cuts off every sub-agent below it`)}
+            ${check(p.guardrail, "Taint after prompt injection", `Risky doors (${(p.risky_scopes || []).join(", ")}) need a human until cleared`)}
+            ${check(true, "Human approval for production", `Undecided requests expire after ${p.approval_timeout}s`)}
+            ${check(true, "Sub-agents can't exceed their parent", `Up to ${p.max_delegation_depth} levels; revoking a parent voids every badge below it`)}
+            ${check(!!p.audit_archive, "Tamper-proof access log", p.audit_archive ? `Archived to s3://${esc(p.audit_archive)} with Object Lock` : "Local log only (cloud archives to S3 with Object Lock)")}
           </div></div>
         </div>
-        <div class="panel"><div class="panel-h"><h3>Tool permissions</h3><span class="sub">which permission each tool needs</span></div>
-          <div class="tablewrap"><table><thead><tr><th>Tool</th><th>Server</th><th>Required permission</th><th>Needs human approval</th></tr></thead><tbody>
+        ${p.cedar_policies && p.cedar_policies.length ? `<div class="panel"><div class="panel-h"><h3>Cedar policies</h3><span class="sub">Amazon Verified Permissions · edits in AWS apply within a minute</span></div>
+          <div class="cedar">${p.cedar_policies.map(c => {
+            const kind = c.description.split(":")[0], pc = kind === "permit" ? "allow" : kind === "approval" ? "pending" : "deny";
+            return `<div><div style="display:flex;gap:10px;align-items:center"><span class="pill ${pc}">${esc(kind)}</span><span>${esc(c.description.split(": ").slice(1).join(": "))}</span></div><pre>${esc(c.statement)}</pre></div>`;
+          }).join("")}</div></div>` : ""}
+        <div class="panel"><div class="panel-h"><h3>Doors</h3><span class="sub">which permission opens each tool</span></div>
+          <div class="tablewrap"><table><thead><tr><th>Tool</th><th>Server</th><th>Permission</th><th>Human approval</th></tr></thead><tbody>
           ${p.tools.map(t => `<tr><td class="mono">${esc(t.name)}</td><td>${esc(t.server || "–")}</td><td><span class="scope">${esc(t.scope)}</span></td><td>${rule(t.approval)}</td></tr>`).join("")}
           </tbody></table></div></div>
-        ${p.cedar_policies && p.cedar_policies.length ? `<div class="panel"><div class="panel-h"><h3>Cedar policies</h3><span class="sub">Amazon Verified Permissions · edits in AWS apply within a minute</span></div>
-          <div style="display:grid;gap:12px">${p.cedar_policies.map(c => {
-            const kind = c.description.split(":")[0];
-            const pillc = kind === "permit" ? "allow" : kind === "approval" ? "pending" : "deny";
-            return `<div><div class="row" style="margin-bottom:6px"><span class="pill ${pillc}">${esc(kind)}</span><span>${esc(c.description.split(": ").slice(1).join(": "))}</span></div><pre class="json" style="background:var(--hover);border:1px solid var(--line);border-radius:8px;padding:10px 12px">${esc(c.statement)}</pre></div>`;
-          }).join("")}</div></div>` : ""}
-        ${p.workloads.length ? `<div class="panel"><div class="panel-h"><h3>Workload identities</h3><span class="sub">AWS roles that sign in without a stored secret</span></div>
+        ${p.workloads.length ? `<div class="panel"><div class="panel-h"><h3>Workload identities</h3><span class="sub">AWS roles that get a badge without any stored secret</span></div>
           <div class="tablewrap"><table><thead><tr><th>IAM role</th><th>Agent</th><th>Permissions</th></tr></thead><tbody>
           ${p.workloads.map(w => `<tr><td class="mono">${esc(w.role)}</td><td>${esc(w.name)}</td><td><div class="scopes">${w.scopes.map(s => `<span class="scope">${esc(s)}</span>`).join("")}</div></td></tr>`).join("")}
           </tbody></table></div></div>` : ""}`);
@@ -698,11 +752,11 @@ window.runAllAttacks = async () => { for (const a of (S.attacks || [])) await ru
 function downloadCSV() {
   const rows = VIEWS.audit.filtered();
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const csv = ["time,agent,agent_id,action,decision,reason,latency_ms,detail"].concat(rows.map(e =>
-    [new Date(e.ts * 1000).toISOString(), e.agent_name, e.agent_id, action(e), e.decision, e.reason, e.latency_ms, JSON.stringify(e.detail || {})].map(q).join(","))).join("\n");
+  const csv = ["time,agent,agent_id,door,outcome,reason,latency_ms,detail"].concat(rows.map(e =>
+    [new Date(e.ts * 1000).toISOString(), e.agent_name, e.agent_id, action(e), DECISION_LABEL[e.decision] || e.decision, e.reason, e.latency_ms, JSON.stringify(e.detail || {})].map(q).join(","))).join("\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  a.download = `lanyard-audit-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.csv`;
+  a.download = `lanyard-access-log-${new Date().toISOString().slice(0, 19).replace(/:/g, "")}.csv`;
   a.click(); URL.revokeObjectURL(a.href);
 }
 
@@ -727,17 +781,17 @@ function render() {
   const rv = S.agents.filter(a => a.revoked).length, ar = document.getElementById("n-agents-rev");
   ar.hidden = !rv; ar.textContent = rv; ar.title = `${rv} revoked`;
 }
-
 async function poll() {
   try {
     const s = await api(`/api/state?after=${S.lastId}`);
     if (S.lastId > 0 && !s.agents.length && !s.events.length && S.agents.length) { S.events = []; S.lastId = 0; return poll(); } // state was reset
     S.agents = s.agents; S.approvals = s.approvals || [];
     if (s.events.length) { S.events = S.events.concat(s.events).slice(-3000); S.lastId = s.events[s.events.length - 1].id; }
-    document.getElementById("live").classList.remove("down"); document.getElementById("live-t").textContent = "Live";
+    document.getElementById("live").classList.remove("down");
+    document.getElementById("live-t").textContent = `LIVE · ${new Date().toLocaleTimeString([], { hour12: false })}`;
     render();
   } catch (e) {
-    document.getElementById("live").classList.add("down"); document.getElementById("live-t").textContent = "Reconnecting";
+    document.getElementById("live").classList.add("down"); document.getElementById("live-t").textContent = "RECONNECTING";
   }
 }
 async function loadPolicy() {
@@ -745,24 +799,24 @@ async function loadPolicy() {
     S.policy = await api("/api/policy");
     document.getElementById("f-env").textContent = S.policy.environment;
     document.getElementById("f-store").textContent = S.policy.store;
-    document.getElementById("f-guard").textContent = S.policy.guardrail ? "On" : "Off";
+    document.getElementById("f-engine").textContent = S.policy.cedar_policies && S.policy.cedar_policies.length ? "Cedar · AVP" : "Built-in";
     if (route === "policy") render();
   } catch (e) { /* retried on the next interval */ }
 }
 
-// theme: system -> light -> dark
-const THEMES = ["system", "light", "dark"];
+// theme: dark (default) -> light -> system
+const THEMES = ["dark", "light", "system"];
+let theme = "dark";
+try { theme = localStorage.getItem("lanyard-theme-v2") || "dark"; } catch (e) {}
 function applyTheme(t) {
-  if (t === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  document.documentElement.setAttribute("data-theme", t);
   document.getElementById("theme-btn").textContent = `Theme: ${t}`;
   for (const id of ["c-dec", "c-why"]) { const el = document.getElementById(id); if (el) el._key = null; }
 }
-let theme = "system";
-try { theme = localStorage.getItem("lanyard-theme") || "system"; } catch (e) {}
 applyTheme(theme);
 document.getElementById("theme-btn").onclick = () => {
-  theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme);
-  try { localStorage.setItem("lanyard-theme", theme); } catch (e) {}
+  theme = THEMES[(THEMES.indexOf(theme) + 1) % 3]; applyTheme(theme); render();
+  try { localStorage.setItem("lanyard-theme-v2", theme); } catch (e) {}
 };
 
 setInterval(() => document.querySelectorAll(".ago").forEach(s => { s.textContent = ago(+s.dataset.ts); }), 1000);

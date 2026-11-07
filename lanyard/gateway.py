@@ -167,24 +167,26 @@ async def logout():
 
 LOGIN_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Lanyard Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-:root{color-scheme:light;--page:#f4f4f1;--surface:#fcfcfb;--ink:#0b0b0b;--muted:#75736d;--line:rgba(11,11,11,.12);--accent:#2a78d6;--crit:#b42323}
-@media (prefers-color-scheme:dark){:root{color-scheme:dark;--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--muted:#94928b;--line:rgba(255,255,255,.12);--accent:#3987e5;--crit:#f07a7a}}
+:root{color-scheme:dark;--page:#0a0f1c;--ink:#e9edf7;--muted:#8590ab;--line:rgba(255,255,255,.1);--brand:#5b8cff;--brand2:#9bb5ff;--badge:#f3f0e7;--bink:#151a2b;--bmuted:#6c7080;--crit:#e5484d}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--page);color:var(--ink);
-font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
-form{width:100%;max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px}
-.mark{width:36px;height:36px;border-radius:9px;background:var(--accent);display:grid;place-items:center;margin-bottom:14px}
-h1{font-size:20px;margin:0 0 4px}p{margin:0 0 18px;color:var(--muted)}
-label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-input{width:100%;font:inherit;color:inherit;background:var(--page);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-button{margin-top:14px;width:100%;font:inherit;font-weight:600;border:0;border-radius:8px;padding:10px;background:var(--accent);color:#fff;cursor:pointer}
-.err{color:var(--crit);margin:10px 0 0}
-</style></head><body>
-<form method="post" action="/login">
-<div class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l4 6 4-6"/><rect x="5" y="8" width="14" height="14" rx="2.5"/><circle cx="12" cy="13.5" r="2"/><path d="M9 18.5h6"/></svg></div>
-<h1>Lanyard Console</h1><p>Identity and access control for AI agents</p>
+font:15px/1.5 "Space Grotesk",system-ui,sans-serif;padding:16px;
+background-image:repeating-linear-gradient(180deg,var(--brand) 0 14px,var(--brand2) 14px 18px,var(--brand) 18px 32px);background-size:6px 100%;background-repeat:no-repeat;background-position:50% 0}
+.wrap{position:relative;padding-top:34px;width:100%;max-width:360px}
+.clip{position:absolute;top:24px;left:50%;width:34px;height:18px;transform:translateX(-50%);border-radius:5px;background:linear-gradient(180deg,#d9dce4,#9aa0ae);z-index:2}
+form{background:var(--badge);color:var(--bink);border-radius:18px;overflow:hidden;box-shadow:0 24px 50px -20px rgba(0,0,0,.8)}
+.band{margin-top:30px;padding:10px 22px;background:var(--brand);color:#fff;display:flex;justify-content:space-between;font:600 10.5px/1 "JetBrains Mono",monospace;letter-spacing:.16em;text-transform:uppercase}
+.in{padding:22px}h1{font-size:24px;margin:0 0 2px;letter-spacing:-.02em}p{margin:0 0 18px;color:var(--bmuted)}
+label{display:block;font:600 10.5px/1 "JetBrains Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--bmuted);margin-bottom:8px}
+input{width:100%;font:inherit;color:var(--bink);background:#fff;border:1px solid rgba(21,26,43,.18);border-radius:9px;padding:11px 12px}
+button{margin-top:14px;width:100%;font:inherit;font-weight:700;border:0;border-radius:9px;padding:11px;background:var(--bink);color:#fff;cursor:pointer}
+.err{color:var(--crit);margin:10px 0 0;font-weight:600}
+</style></head><body><div class="wrap"><div class="clip"></div>
+<form method="post" action="/login"><div class="band"><span>Pinecrest · Admin pass</span><span>Lanyard</span></div>
+<div class="in"><h1>Lanyard Console</h1><p>Identity and access control for AI agents</p>
 <label for="pw">Admin password</label><input id="pw" name="password" type="password" autocomplete="current-password" autofocus required>
-{error}<button type="submit">Sign in</button></form></body></html>"""
+{error}<button type="submit">Swipe in</button></div></form></div></body></html>"""
 
 
 # Optional: scan tool responses with Bedrock Guardrails. Fails closed unless LANYARD_GUARDRAIL_FAIL=open.
