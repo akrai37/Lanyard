@@ -42,6 +42,16 @@ Run: `uv run python scripts/demo_agent.py trusted --delay 2`
 After 2 or 3 green ticks, click **Revoke** on the trusted-agent card.
 > "I just revoked this agent while it's working. Its next call..." (wait for the red 403) "...is blocked. Look at the reason in the log: its token is still valid for another 23 hours. Token expiry doesn't protect you; Lanyard revokes the agent's identity, so even fetching a new token doesn't help."
 
+### 4b. A real AI agent (60 seconds, strongest moment after revocation)
+Run: `scripts/run_ai_agent.sh` (it streams what Claude does), with the dashboard's **Approvals** page open.
+> "This is Claude Opus 5.5 on Amazon Bedrock, running in AWS. It signed in with its own AWS role, no secret, and it's triaging support tickets. It decides which tools to call; Lanyard checks every one, using Cedar policies in Amazon Verified Permissions."
+
+When TCK-2007 is blocked:
+> "That ticket has a hidden instruction to leak data and deploy to production. Bedrock Guardrails blocked it, and Lanyard marked the agent tainted."
+
+When the approval card appears (its `write_file`):
+> "Because it's tainted, its next write needs a human." Click **Approve** (or **Deny**).
+
 ### 5. Workload identity: an agent with no secret (40 seconds)
 `scripts/reset_demo.sh cloud`, then run: `scripts/run_cloud_agent.sh`, and open the **Agents** page.
 > "This agent runs inside AWS Lambda, and it has no password, no API key, nothing stored. It proved who it is with its AWS role: it signed a request, AWS confirmed the signature, and Lanyard gave it a 10-minute token. It only got read and deploy, not write."
@@ -74,7 +84,9 @@ Optional, if there's time: `scripts/launch_agent.sh intern` and ask it "deploy p
 
 - **"What if the agent just gets a new token?"** Two layers. Revocation is keyed on the agent's identity, not the token, so a new token is blocked too. And Revoke also removes the agent's grant in Auth0, so Auth0 won't issue it a token in the first place. (This needs the `lanyard-admin` Auth0 app configured; the Policy page shows whether it's on.)
 - **"Where is the workload identity?"** Agents on AWS sign in with their IAM role, no stored secret. It's the same pattern HashiCorp Vault uses: the agent signs an AWS request, AWS verifies the signature, and Lanyard only trusts roles in its own account. The signature includes a Lanyard-specific header, so it can't be replayed elsewhere.
-- **"How do you stop a forged token?"** Each issuer is pinned to one algorithm and key: Auth0 tokens use RS256 with Auth0's public keys; Lanyard's own tokens use HS256 with a key in AWS Secrets Manager. We tested forged tokens and tampered signatures; both are rejected.
+- **"Who decides what's allowed?"** Amazon Verified Permissions, with Cedar policies you can read on the Policy page. If it can't answer, the call is denied; we tested a missing policy store and an unreachable endpoint.
+- **"Where are your signing keys?"** In AWS KMS. Lanyard asks KMS to sign; the private key never leaves it. The public key is published so anyone can verify Lanyard tokens.
+- **"How do you stop a forged token?" Each issuer is pinned to one algorithm and key: Auth0 tokens use RS256 with Auth0's public keys; Lanyard's own tokens use HS256 with a key in AWS Secrets Manager. We tested forged tokens and tampered signatures; both are rejected.
 - **"What about a call already in progress when you revoke?"** It completes; revocation applies from the next call. Holding high-risk calls for approval covers the dangerous ones.
 - **"Does this scale?"** "It's running on AWS Lambda right now, which runs as many copies of the gateway as traffic needs. The gateway is stateless; revocations live in DynamoDB with strongly consistent reads, so a revoke reaches every copy on the next call. We tested two gateways: revoke through one, and the other blocked the agent immediately."
 - **"Can an agent skip Lanyard and call the tools directly?"** No. The tool servers are private Lambda functions with no public URL; only the gateway's IAM role can invoke them.

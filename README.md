@@ -12,6 +12,8 @@ Lanyard is a gateway between AI agents and their [MCP](https://modelcontextproto
 |---|---|
 | **Agent identity** | Each agent authenticates with OAuth 2.0 client credentials against Auth0 (Okta) and presents a signed JWT on every request. |
 | **Workload identity** | Agents running on AWS sign in with their IAM role and hold no secret at all. The agent signs an `sts:GetCallerIdentity` request bound to Lanyard; Lanyard has AWS verify it, maps the role to an agent identity, and issues a 10-minute token. |
+| **Policy as code (Amazon Verified Permissions)** | Every tool call is decided by Cedar policies in Amazon Verified Permissions: a permit for "the token has the tool's scope", forbids for admin blocks and for sub-agents touching production, and approval gates for production deploys and tainted agents. If Verified Permissions errors or is slow, the call is denied. |
+| **A real AI agent** | Claude Opus 5.5 on Amazon Bedrock runs as a Lambda, signs in with its own IAM role, and decides which tools to call. Lanyard governs every call: in testing it read a poisoned ticket, was blocked and tainted, and its next write waited for a human. |
 | **Least privilege** | Token scopes map to tools. `tools/list` only returns the tools an agent may call, and `tools/call` is enforced again server side. Unknown tools are denied by default. |
 | **Instant revocation** | Revocation is keyed on the agent's identity (Auth0 client ID or IAM role), not the token, and is checked on every request. A revoked agent gets HTTP 403 on its next call, and fetching a new token does not help. |
 | **Cut off at the source** | Revoking also removes the agent's grant in Auth0 (through the Management API), so Auth0 stops issuing it tokens; Restore recreates the grant. Revoked workload identities are refused new Lanyard tokens. |
@@ -51,7 +53,9 @@ The gateway holds no state of its own. Revocations, admin blocks, pending approv
 
 - **Revoke the identity, not the token.** JWTs cannot be recalled, and an agent with client credentials can always mint a new one. Lanyard keys revocation on the `azp` (client ID) claim and checks it on every request, and also removes the agent's grant at Auth0 so no new token can be minted.
 - **No secrets for workloads.** An agent on AWS proves its identity with a SigV4 signature from its IAM role. The signed request must carry Lanyard's audience header inside the signature, so it cannot be replayed against another service, and Lanyard only accepts roles in its own AWS account. Lanyard never sees the agent's AWS credentials.
-- **Two issuers, each pinned.** Auth0 tokens are verified only with RS256 and Auth0's public keys; Lanyard's own workload tokens only with HS256 and a key held in AWS Secrets Manager. A token cannot switch algorithm or issuer to slip through.
+- **Two issuers, each pinned.** Auth0 tokens are verified only with RS256 and Auth0's public keys. Lanyard's own tokens (workloads, sub-agents) are RS256, signed by an AWS KMS key whose private half never leaves KMS; the public key is published at `/.well-known/jwks.json`. HS256 is rejected, which defeats the classic algorithm-confusion attack.
+- **Fail closed, everywhere.** If Verified Permissions or Bedrock Guardrails can't answer, the call is denied. Tested by pointing Lanyard at a missing policy store and at an unreachable endpoint: both deny within seconds.
+- **Never ask a human to approve the impossible.** Before holding a call for approval, Lanyard checks with Verified Permissions that approval would actually allow it.
 - **Default deny.** A tool with no policy entry is not callable, even by a fully scoped agent.
 - **Enforce twice.** Hiding a tool from `tools/list` is a convenience; `tools/call` is authorized independently, so a client that guesses tool names gains nothing.
 - **Fail closed.** If the guardrail scan is unavailable, tool responses are withheld rather than passed through unchecked.
@@ -83,6 +87,8 @@ uv run python scripts/demo_agent.py intern
 uv run python scripts/demo_agent.py aws          # sign in with this machine's AWS identity
 scripts/launch_agent.sh trusted                  # Claude Code as a governed agent
 scripts/run_cloud_agent.sh                       # an agent inside AWS Lambda, no stored secret
+scripts/run_ai_agent.sh                          # Claude Opus 5.5 on Bedrock, governed by Lanyard
+uv run python -m lanyard.ai_agent                # the same AI agent from your laptop
 uv run python scripts/demo_agent.py team         # sub-agents; revoke trusted-agent to cut off all of them
 scripts/simulator.sh on|off                      # cloud traffic simulator (5 synthetic agents)
 uv run python scripts/generate_data.py --upload  # regenerate the synthetic file share
@@ -99,6 +105,9 @@ lanyard/policy.py       backends, tool → scope map, approval rules, workload i
 lanyard/workload.py     AWS IAM workload identity (sign, verify, issue tokens)
 lanyard/auth0_admin.py  remove and restore an agent's Auth0 grant
 lanyard/guardrails.py   Bedrock Guardrails scan of tool responses
+lanyard/avp.py          Amazon Verified Permissions: Cedar policies and the authorization call
+lanyard/tokens.py       KMS (RS256) signing and verification of Lanyard tokens, public JWKS
+lanyard/ai_agent.py     Claude Opus 5.5 on Bedrock as a governed agent
 lanyard/agent_runner.py scripted agent and sub-agent team, used on a laptop and in the cloud
 lanyard/simulator.py    synthetic agents with their own IAM roles
 lanyard/attacks.py      attack lab
@@ -136,7 +145,10 @@ flowchart LR
 | **Amazon S3** | The company file share (private, encrypted) and the audit archive (Object Lock, compliance mode). |
 | **DynamoDB Streams** | Feed every new audit event to the archiver Lambda. |
 | **Amazon EventBridge** | Starts the traffic simulator every minute when it is switched on. |
-| **AWS Secrets Manager** | Holds the gateway's secrets: the workload token signing key, the admin password, and the optional Auth0 management credential. |
+| **Amazon Bedrock (Claude Opus 5.5)** | The AI agent's model, through the Anthropic SDK's Bedrock client, with a refusal fallback to Claude Opus 4.8. |
+| **Amazon Verified Permissions** | Evaluates Lanyard's Cedar policies on every tool call. |
+| **AWS KMS** | Signs Lanyard-issued tokens (RSA 2048, RS256). |
+| **AWS Secrets Manager** | Holds the gateway's only secrets: the admin password and the optional Auth0 management credential. No signing key exists outside KMS. |
 
 Agents' Auth0 client secrets are never deployed; the gateway verifies their tokens with Auth0's public keys.
 
