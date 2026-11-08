@@ -103,6 +103,7 @@ def agent_name(agent_id: str) -> str:
 
 
 SESSION_COOKIE = "lanyard_admin"
+NO_STORE = {"Cache-Control": "no-store"}
 SESSION_SECONDS = 12 * 3600
 
 
@@ -136,12 +137,15 @@ def _admin_ok(request: Request) -> bool:
 async def admin_auth(request: Request, call_next):
     """The console and admin API need the admin password (login page or HTTP Basic) when
     LANYARD_ADMIN_PASSWORD is set. /mcp and /auth/* are protected separately, by agent tokens."""
-    open_paths = ("/mcp", "/auth/", "/.well-known/", "/login")
+    open_paths = ("/mcp", "/auth/", "/.well-known/", "/login", "/logout")
     if ADMIN_PASSWORD and not request.url.path.startswith(open_paths) and not _admin_ok(request):
         if request.url.path == "/":
-            return HTMLResponse(LOGIN_PAGE.replace("{error}", ""))
-        return JSONResponse({"error": "admin login required"}, status_code=401)
-    return await call_next(request)
+            return HTMLResponse(LOGIN_PAGE.replace("{error}", ""), headers=NO_STORE)
+        return JSONResponse({"error": "admin login required"}, status_code=401, headers=NO_STORE)
+    response = await call_next(request)
+    if not request.url.path.startswith(("/mcp", "/.well-known/")):
+        response.headers["Cache-Control"] = "no-store"  # never show a cached console after sign-out
+    return response
 
 
 @app.post("/login")
@@ -151,7 +155,8 @@ async def login(request: Request):
         return RedirectResponse("/", status_code=303)
     if not secrets.compare_digest(str(form.get("password", "")), ADMIN_PASSWORD):
         await asyncio.sleep(1)  # slow down guessing
-        return HTMLResponse(LOGIN_PAGE.replace("{error}", '<p class="err">Wrong password.</p>'), status_code=401)
+        return HTMLResponse(LOGIN_PAGE.replace("{error}", '<p class="err">Wrong password.</p>'), status_code=401,
+                            headers=NO_STORE)
     resp = RedirectResponse("/", status_code=303)
     resp.set_cookie(SESSION_COOKIE, _session_value(int(time.time()) + SESSION_SECONDS), max_age=SESSION_SECONDS,
                     httponly=True, samesite="strict", secure=request.url.scheme == "https")
@@ -159,9 +164,11 @@ async def login(request: Request):
 
 
 @app.get("/logout")
-async def logout():
-    resp = RedirectResponse("/", status_code=303)
-    resp.delete_cookie(SESSION_COOKIE)
+async def logout(request: Request):
+    resp = RedirectResponse("/", status_code=303, headers=NO_STORE)
+    # same attributes as at sign-in, or some browsers keep the old cookie
+    resp.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="strict",
+                       secure=request.url.scheme == "https")
     return resp
 
 
