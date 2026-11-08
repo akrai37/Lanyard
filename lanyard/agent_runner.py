@@ -65,7 +65,7 @@ def run(gateway: str, token: str, label: str, delay: float = 3.0, color: bool = 
         time.sleep(delay)
         call = f"{name}({', '.join(f'{k}={v!r}' for k, v in arguments.items() if k != 'content')})"
         if arguments.get("environment") == "production":
-            print(f"{d}… {call}: high-risk, waiting for human approval in the dashboard{z}", flush=True)
+            print(f"{d}… {call}: production deploy, Lanyard may hold it for human approval{z}", flush=True)
         r = rpc("tools/call", {"name": name, "arguments": arguments})
         if r.status_code == 403:
             print(f"{r_}✗ {call}  →  HTTP 403: {r.json()['error']['message']}{z}", flush=True)

@@ -35,9 +35,9 @@ Point at the **Overview**: the chart, the denial reasons, the activity feed.
 
 Run:
 ```bash
-uv run python scripts/demo_agent.py trusted --task revoke --delay 1.5
+uv run python scripts/demo_agent.py trusted --task revoke --delay 2.5
 ```
-Open **Agents**. The agent makes 16 safe calls, about 25 seconds in all, so there's no rush: click **Revoke badge** on `trusted-agent` whenever you're ready.
+Open **Agents**. The agent makes 16 safe calls, about 45 seconds in all, and its badge is first on the page, so there's no rush: click **Revoke badge** on `trusted-agent` whenever you're ready.
 
 > "This agent signed in with Auth0 and is working. I revoke it now." (wait for the red 403) "Its very next call is blocked, in about 10 milliseconds, because Lanyard checks revocation before anything else. Look at the reason in the log: its token is still valid for almost 24 hours. And Lanyard also removed its grant in Auth0, so it can't get a new token either. Two layers."
 

@@ -521,7 +521,10 @@ function requestCard(a) {
 function agentTree(agents) {
   const kids = {}, byId = new Set(agents.map(a => a.agent_id));
   agents.forEach(a => { const p = a.parent && byId.has(a.parent) ? a.parent : ""; (kids[p] = kids[p] || []).push(a); });
-  return { roots: kids[""] || [], kids };
+  // stable order, demo agents first: Auth0 agents, then AWS and AI agents, then simulated traffic, then the red team
+  const rank = a => a.identity === "auth0" ? 0 : a.identity === "red-team" ? 3 : String(a.agent_id).includes("lanyard-sim-") ? 2 : 1;
+  const roots = (kids[""] || []).slice().sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  return { roots, kids };
 }
 function setHTML(el, html) { if (el && el._html !== html) { el.innerHTML = html; el._html = html; } }
 
