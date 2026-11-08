@@ -14,7 +14,7 @@ Built for the A10 Agentic Identity track. Running live on AWS.
 
 ## Demo
 
-<!-- DEMO VIDEO: replace this comment with the github.com/user-attachments/assets/... link on its own line -->
+https://github.com/user-attachments/assets/61ecbf9c-7cd1-4b2d-b7b9-20284fffa287
 
 *A 6-minute walkthrough: how a tool call flows through Lanyard, revoking an agent mid-task, a real Claude agent meeting a prompt injection, and nine live attacks against the gateway.*
 
