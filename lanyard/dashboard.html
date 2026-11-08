@@ -268,6 +268,26 @@
   .attack .verdict.skip { color: var(--muted); }
   .attack .row { margin-top: auto; }
 
+  .flow { display: grid; grid-template-columns: minmax(0, 1fr) 34px minmax(0, 1fr) 34px minmax(0, 2.2fr) 34px minmax(0, 1fr); align-items: stretch; gap: 0; }
+  .flow .col { display: grid; gap: 12px; align-content: start; }
+  .flow .arrow { display: grid; place-items: center; color: var(--muted); font: 600 18px/1 "JetBrains Mono", monospace; }
+  .node { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 8px; }
+  .node h4 { margin: 0; font-size: 14.5px; }
+  .node p { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+  .node .k { font: 600 10px/1 "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .svc { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font: 600 11px/1 "JetBrains Mono", monospace; padding: 5px 8px; border-radius: 6px; background: rgba(255,153,0,.13); color: #ffb547; border: 1px solid rgba(255,153,0,.3); }
+  :root[data-theme="light"] .svc { background: #fff4e5; color: #9a5800; border-color: #f5c27a; }
+  .svc.ext { background: var(--brand-wash); color: var(--info-ink); border-color: transparent; }
+  .gate { border: 2px solid var(--brand); border-radius: 16px; padding: 14px; display: grid; gap: 10px; position: relative; background: linear-gradient(180deg, var(--brand-wash), transparent 40%); }
+  .gate .gt { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .gate .gt h4 { margin: 0; font-size: 16px; }
+  .step { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .step .n { width: 30px; height: 30px; border-radius: 9px; background: var(--brand); color: #fff; display: grid; place-items: center; font: 700 14px/1 "Space Grotesk", sans-serif; }
+  .step b { display: block; font-size: 13.5px; }
+  .step span.d { display: block; font-size: 12.5px; color: var(--ink-2); margin: 2px 0 7px; }
+  .step .fail { font: 500 11.5px/1.3 "JetBrains Mono", monospace; color: var(--crit-ink); }
+  .under { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+  @media (max-width: 1150px) { .flow { grid-template-columns: minmax(0, 1fr); } .flow .arrow { transform: rotate(90deg); padding: 4px 0; } .under { grid-template-columns: minmax(0, 1fr); } }
   .toast { position: fixed; right: 22px; bottom: 22px; z-index: 60; background: var(--ink); color: var(--page); padding: 11px 15px; border-radius: 11px; font-size: 13px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none; }
   .toast.on { opacity: 1; transform: none; }
 
@@ -299,6 +319,7 @@
     </div>
     <nav class="nav" id="nav">
       <a href="#/overview" data-r="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
+      <a href="#/how" data-r="how"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 6h9M6.5 8l4.3 7.8M17.5 8l-4.3 7.8"/></svg>How it works</a>
       <a href="#/agents" data-r="agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l3 4 3-4"/><rect x="5" y="6" width="14" height="16" rx="2.5"/><circle cx="12" cy="12" r="2.5"/><path d="M8.5 18h7"/></svg>Agents<span class="count red" id="n-agents-rev" hidden></span></a>
       <a href="#/approvals" data-r="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Approvals<span class="count" id="n-approvals" hidden></span></a>
       <a href="#/audit" data-r="audit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Access log</a>
@@ -601,6 +622,49 @@ const VIEWS = {
       setHTML(document.getElementById("o-feed"), feedHTML(S.events.filter(e => e.method !== "tools/list").slice(-8).reverse()));
       setHTML(document.getElementById("o-appr"), S.approvals.length ? `<div class="desk">${S.approvals.map(requestCard).join("")}</div>` : `<div class="empty">Nobody waiting. Production deploys and tainted agents stop here.</div>`);
     },
+  },
+
+  how: {
+    title: "How it works",
+    desc: "One tool call, end to end. Every call from every agent goes through the same checks, in this order, each one handled by an AWS service.",
+    mount: v => v.innerHTML = `
+      <div class="panel">
+        <div class="flow">
+          <div class="col">
+            <span class="k eyebrow">The agent</span>
+            <div class="node"><h4>AI agent</h4><p>Claude Opus 5.5 on Bedrock, Claude Code, Kiro, or any MCP agent. It has no direct access to company tools.</p>
+              <span class="svc">Amazon Bedrock</span><span class="svc">AWS Lambda</span></div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="col">
+            <span class="k eyebrow">Its badge</span>
+            <div class="node"><h4>Enterprise login</h4><p>OAuth client credentials. Auth0 issues a signed token.</p><span class="svc ext">Auth0 (Okta)</span></div>
+            <div class="node"><h4>Workload identity</h4><p>No secret at all: the agent proves its AWS role; Lanyard issues a 10-minute token signed in KMS.</p><span class="svc">IAM + STS</span><span class="svc">AWS KMS</span></div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="gate">
+            <div class="gt"><h4>Lanyard gateway</h4><span class="svc">AWS Lambda</span><span class="muted" style="font-size:12.5px">every tool call, in order:</span></div>
+            <div class="step"><div class="n">1</div><div><b>Check the badge</b><span class="d">Signature, issuer, audience, expiry. Forged, unsigned and algorithm-confused tokens fail here.</span><span class="svc">AWS KMS public key</span> <span class="svc ext">Auth0 keys</span></div></div>
+            <div class="step"><div class="n">2</div><div><b>Is the badge revoked?</b><span class="d">Checked first, on every call, by identity, not token. Parent revoked means sub-agents are too.</span><span class="svc">Amazon DynamoDB</span><div class="fail" style="margin-top:6px">revoked → 403 in milliseconds</div></div></div>
+            <div class="step"><div class="n">3</div><div><b>Is this door allowed?</b><span class="d">Cedar policies decide: scopes, admin blocks, sub-agent limits, production rules. If AWS can't answer, the call is denied.</span><span class="svc">Amazon Verified Permissions</span></div></div>
+            <div class="step"><div class="n">4</div><div><b>Does a human need to sign off?</b><span class="d">Production deploys, and risky calls from a tainted agent, wait at the Security desk.</span><span class="svc">Amazon DynamoDB</span></div></div>
+            <div class="step"><div class="n">5</div><div><b>Call the tool</b><span class="d">Tool servers are private Lambda functions with no public URL; files live in S3.</span><span class="svc">AWS Lambda</span> <span class="svc">Amazon S3</span></div></div>
+            <div class="step"><div class="n">6</div><div><b>Scan what comes back</b><span class="d">Prompt injection is blocked before the AI reads it, and the agent is tainted. Emails and phone numbers are masked.</span><span class="svc">Amazon Bedrock Guardrails</span></div></div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="col">
+            <span class="k eyebrow">The record</span>
+            <div class="node"><h4>Access log</h4><p>Every decision, with its reason, streams to an archive that no one can edit or delete.</p><span class="svc">DynamoDB Streams</span><span class="svc">S3 Object Lock</span></div>
+            <div class="node"><h4>This console</h4><p>Revoke badges, lock doors, approve requests, run attacks.</p><span class="svc">AWS Lambda</span><span class="svc">Secrets Manager</span></div>
+          </div>
+        </div>
+        <div class="under">
+          <div class="node"><span class="k eyebrow">Revoke = two layers</span><p>Lanyard blocks the token the agent already holds, and Auth0 stops issuing it new ones.</p></div>
+          <div class="node"><span class="k eyebrow">Fails closed</span><p>If Verified Permissions or Guardrails can't answer, the call is denied, never waved through.</p></div>
+          <div class="node"><span class="k eyebrow">Scales by itself</span><p>The gateway keeps no state of its own, so Lambda runs as many copies as needed, all sharing DynamoDB.</p></div>
+        </div>
+      </div>`,
+    update() {},
   },
 
   agents: {

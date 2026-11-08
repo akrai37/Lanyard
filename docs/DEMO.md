@@ -25,6 +25,10 @@ After the demo: `scripts/simulator.sh off`. Between rehearsals: `scripts/reset_d
 
 > "AI agents now take real actions: they read customer data and deploy code. But once an agent has a token, it keeps its access for hours, even if it goes wrong halfway through a task. Lanyard gives every agent an identity and checks every single tool call."
 
+## 2a. How it works (optional, if judges ask "how?")
+
+Open **How it works** in the sidebar: one diagram of the flow, with the AWS service behind each step. Walk down the six numbered gateway steps.
+
 ## 2. A company running on agents (0:15 to 0:30)
 
 Point at the **Overview**: the chart, the denial reasons, the activity feed.
