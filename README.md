@@ -6,6 +6,8 @@ Deployed on AWS: Lambda (function URLs), DynamoDB and DynamoDB Streams, Amazon V
 
 https://github.com/user-attachments/assets/61ecbf9c-7cd1-4b2d-b7b9-20284fffa287
 
+[Watch on YouTube](https://youtu.be/s2sjjWRLNR8)
+
 ## The problem
 
 An agent with a bearer token holds a capability: anything the token permits, the agent can do, on every call, until the token expires. That is acceptable for a human clicking through a UI. It is not acceptable for an autonomous process that reads untrusted content and can be steered by it mid-task.
