@@ -36,7 +36,7 @@ Speak a little slower than feels natural. The times are a guide, not a rule.
 | | |
 |---|---|
 | **DO** | Click **How it works** in the sidebar. |
-| **SAY** | "Here's the flow. An agent never talks to company tools directly. It gets a badge first: either an Auth0 login for enterprise agents, or, for agents running on AWS, its IAM role, with no secret at all. Lanyard then issues a short-lived token signed by AWS KMS." |
+| **SAY** | "Here's the flow. An agent never talks to company tools directly. It gets a badge first: either an Auth0 login for enterprise agents, or, for agents running on AWS, its IAM role, with no secret at all, and for those, Lanyard issues a 10-minute token signed by AWS KMS." |
 | **DO** | Move the mouse down the six numbered steps in the blue **Lanyard gateway** box as you talk. |
 | **SAY** | "Every tool call then goes through this gateway, running on AWS Lambda, in this order. Check the badge. Check DynamoDB for revocation, first, on every call. Ask Amazon Verified Permissions whether the Cedar policies allow this door. Hold risky calls for a human. Call the tool, which is a private Lambda with files in S3. And finally, scan what comes back with Bedrock Guardrails before the AI ever reads it." |
 | **DO** | Point at **Access log** on the right. |
@@ -74,7 +74,7 @@ Speak a little slower than feels natural. The times are a guide, not a rule.
 | **DO** | Wait for the yellow card on the **Security desk** (10 to 20 seconds). |
 | **SAY** | "Because it read an attack, Verified Permissions now requires a human for anything risky. It wants to save its summary, so I'll approve that." |
 | **DO** | Click **Approve**. Wait for the `[claude]` line in the terminal. |
-| **SAY** | "Claude finishes, and its report even mentions what Lanyard blocked." |
+| **SAY** | "Claude finishes and reports what it did." |
 | **DO** | Press **Ctrl + C** in the terminal. |
 
 ## Scene 6: Try to break it (3:05 to 3:25)
