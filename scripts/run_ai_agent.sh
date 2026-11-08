@@ -11,5 +11,6 @@ PAYLOAD='{}'
 aws lambda invoke --function-name lanyard-ai-agent --invocation-type Event --cli-binary-format raw-in-base64-out \
   --payload "$PAYLOAD" "${A[@]}" /dev/null >/dev/null
 echo "AI agent started (Claude Opus 5.5 on Amazon Bedrock). Live output:"
+# Filter on the AWS side (no pipe), so lines appear as soon as the agent writes them.
 aws logs tail /aws/lambda/lanyard-ai-agent --since 10s --follow --format short "${A[@]}" \
-  | grep --line-buffered -E '\[(claude|tool|lanyard)\]|\{.result'
+  --filter-pattern '?"[claude]" ?"[tool]" ?"[lanyard]"'

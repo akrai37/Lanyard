@@ -589,7 +589,8 @@ async def state(after: int = 0):
             parent = next((x.get("parent") for x in store.agents() if x["agent_id"] == parent), None)
         agents.append(a | {"revoked": own, "revoked_by_parent": cascade,
                            "taint": store.taint_of(a["agent_id"]), "tools": tools})
-    return {"agents": agents, "approvals": store.pending_approvals(), "events": store.events(after, 1000 if after == 0 else 200)}
+    return {"agents": agents, "approvals": store.pending_approvals(), "latest_id": store.latest_event_id(),
+            "events": store.events(after, 1000 if after == 0 else 200)}
 
 
 @app.post("/api/approvals/{approval_id}/{decision}")

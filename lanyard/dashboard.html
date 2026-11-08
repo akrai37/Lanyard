@@ -787,7 +787,10 @@ function render() {
 async function poll() {
   try {
     const s = await api(`/api/state?after=${S.lastId}`);
-    if (S.lastId > 0 && !s.agents.length && !s.events.length && S.agents.length) { S.events = []; S.lastId = 0; return poll(); } // state was reset
+    // the state was reset (log numbering started over): drop what we have and load fresh
+    if (S.lastId > 0 && ((s.latest_id ?? S.lastId) < S.lastId || (!s.agents.length && !s.events.length && S.agents.length))) {
+      S.events = []; S.lastId = 0; return poll();
+    }
     S.agents = s.agents; S.approvals = s.approvals || [];
     if (s.events.length) { S.events = S.events.concat(s.events).slice(-3000); S.lastId = s.events[s.events.length - 1].id; }
     document.getElementById("live").classList.remove("down");

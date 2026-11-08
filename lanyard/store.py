@@ -143,6 +143,10 @@ class SQLiteStore:
              json.dumps(detail or {})),
         )
 
+    def latest_event_id(self) -> int:
+        rows = self._q("SELECT MAX(id) AS m FROM audit")
+        return rows[0]["m"] or 0
+
     def events(self, after_id: int = 0, limit: int = 200) -> list[dict]:
         rows = self._q("SELECT * FROM audit WHERE id > ? ORDER BY id DESC LIMIT ?", (after_id, limit))
         return [dict(r) | {"detail": json.loads(r["detail"])} for r in reversed(rows)]

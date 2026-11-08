@@ -177,6 +177,10 @@ class DynamoStore:
             item["tool"] = tool
         self._t.put_item(Item=item)
 
+    def latest_event_id(self) -> int:
+        item = self._get("counter", "audit")  # reset deletes the counter, so ids start over
+        return int(item["n"]) if item else 0
+
     def events(self, after_id: int = 0, limit: int = 200) -> list[dict]:
         items = self._query("audit", KeyConditionExpression=Key("pk").eq("audit") & Key("sk").gt(_pad(after_id)),
                             ScanIndexForward=False, Limit=limit)
