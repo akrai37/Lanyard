@@ -8,3 +8,4 @@ __pycache__/
 logs/
 build/
 *.mp4
+devpost_gallery/
